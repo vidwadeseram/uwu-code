@@ -306,7 +306,7 @@ export default function DashboardPage() {
         />
       </CorePanel>
 
-      <SessionsPanel sessions={sessions} ports={ports} loading={loading} />
+      <SessionsPanel sessions={sessions} ports={ports} loading={loading} onExpose={handleExpose} />
 
       {/* Row 4: Projects Panel (full width) */}
       <ProjectsPanel

@@ -183,41 +183,9 @@ function CloneForm({ onClose, onCloned }: CloneFormProps) {
 export default function ProjectsPanel({ data, onRefresh }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const [showCloneForm, setShowCloneForm] = useState(false);
-  const [cloneAllLoading, setCloneAllLoading] = useState(false);
-  const [cloneAllMessage, setCloneAllMessage] = useState("");
-  const [cloneAllError, setCloneAllError] = useState("");
 
   const totalProjects =
     data?.groups.reduce((sum, g) => sum + g.projects.length, 0) ?? 0;
-
-  const handleCloneAllAllinonepos = async () => {
-    setCloneAllLoading(true);
-    setCloneAllError("");
-    setCloneAllMessage("");
-
-    try {
-      const res = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "clone_all_owner",
-          owner: "allinonepos",
-        }),
-      });
-
-      const payload = await res.json();
-      if (payload.success || payload.partialSuccess) {
-        setCloneAllMessage(payload.message || "Clone all finished.");
-        onRefresh();
-      } else {
-        setCloneAllError(payload.message || "Clone all failed.");
-      }
-    } catch {
-      setCloneAllError("Network error while cloning all repos.");
-    } finally {
-      setCloneAllLoading(false);
-    }
-  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -286,46 +254,6 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
             Clone Project
           </button>
 
-          <button
-            onClick={handleCloneAllAllinonepos}
-            disabled={cloneAllLoading}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all"
-            style={{
-              background: cloneAllLoading
-                ? "rgba(30, 45, 74, 0.5)"
-                : "rgba(0, 255, 136, 0.1)",
-              border: "1px solid rgba(0, 255, 136, 0.25)",
-              color: cloneAllLoading ? "#4a5568" : "#00ff88",
-              cursor: cloneAllLoading ? "not-allowed" : "pointer",
-            }}
-            onMouseEnter={(e) => {
-              if (!cloneAllLoading) {
-                e.currentTarget.style.background = "rgba(0, 255, 136, 0.18)";
-                e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.45)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!cloneAllLoading) {
-                e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)";
-                e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.25)";
-              }
-            }}
-            title="Clone all repos in allinonepos"
-          >
-            {cloneAllLoading ? (
-              <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 12a9 9 0 1 1-9-9" />
-              </svg>
-            ) : (
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="12" x2="12" y2="21" />
-                <path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 4 16.3" />
-                <polyline points="16 16 12 12 8 16" />
-              </svg>
-            )}
-            {cloneAllLoading ? "Cloning…" : "Clone allinonepos"}
-          </button>
-
           {/* Collapse toggle */}
           <button
             onClick={() => setCollapsed((v) => !v)}
@@ -364,31 +292,6 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
         />
       )}
 
-      {!collapsed && cloneAllError && (
-        <div
-          className="text-xs px-2 py-1 rounded"
-          style={{
-            background: "rgba(255, 68, 68, 0.1)",
-            color: "#ff4444",
-            border: "1px solid rgba(255, 68, 68, 0.2)",
-          }}
-        >
-          {cloneAllError}
-        </div>
-      )}
-
-      {!collapsed && cloneAllMessage && (
-        <div
-          className="text-xs px-2 py-1 rounded"
-          style={{
-            background: "rgba(0, 255, 136, 0.1)",
-            color: "#00ff88",
-            border: "1px solid rgba(0, 255, 136, 0.2)",
-          }}
-        >
-          {cloneAllMessage}
-        </div>
-      )}
 
       {/* Content */}
       {!collapsed && (
