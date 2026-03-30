@@ -126,7 +126,12 @@ async def main() -> None:
     model = env.get("OPENROUTER_MODEL", "anthropic/claude-sonnet-4-5")
     llm = ChatOpenRouter(model=model, api_key=openrouter_key, timeout=120)
     print(f"LLM: OpenRouter / {model}")
-    profile = BrowserProfile(headless=True, keep_alive=False)
+    profile = BrowserProfile(
+        headless=True,
+        keep_alive=False,
+        chromium_sandbox=False,
+        args=["--no-sandbox", "--disable-dev-shm-usage"],
+    )
 
     results: list[CaseResult] = []
     skipped_ids: set[str] = set()
