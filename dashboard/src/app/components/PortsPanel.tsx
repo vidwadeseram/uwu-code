@@ -8,6 +8,7 @@ interface Props {
   loading: boolean;
   publicIp: string;
   onExpose: (port: PortInfo) => void;
+  defaultCollapsed?: boolean;
 }
 
 const WELL_KNOWN: Record<number, string> = {
@@ -23,7 +24,7 @@ const WELL_KNOWN: Record<number, string> = {
   5672: "RabbitMQ",
   6379: "Redis",
   7681: "ttyd",
-  8000: "Dev/Skyvern",
+  8000: "Dev Server",
   8080: "HTTP Alt",
   8443: "HTTPS Alt",
   9200: "Elasticsearch",
@@ -60,10 +61,12 @@ export default function PortsPanel({
   loading,
   publicIp,
   onExpose,
+  defaultCollapsed = false,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>("port");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [filterText, setFilterText] = useState("");
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -154,45 +157,71 @@ export default function PortsPanel({
           >
             {loading ? "…" : sorted.length}
           </span>
-          {/* Filter input */}
-          <div className="relative">
+          {/* Filter input — only shown when expanded */}
+          {!collapsed && (
+            <div className="relative">
+              <svg
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
+                style={{ color: "#4a5568" }}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Filter..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="pl-7 pr-3 py-1 rounded text-xs outline-none transition-colors w-28 focus:w-40"
+                style={{
+                  background: "rgba(30, 45, 74, 0.5)",
+                  border: "1px solid rgba(30, 45, 74, 0.8)",
+                  color: "#e2e8f0",
+                  transitionProperty: "width",
+                  transitionDuration: "200ms",
+                }}
+                onFocus={(e) =>
+                  (e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.4)")
+                }
+                onBlur={(e) =>
+                  (e.currentTarget.style.borderColor = "rgba(30, 45, 74, 0.8)")
+                }
+              />
+            </div>
+          )}
+          {/* Collapse / expand toggle */}
+          <button
+            onClick={() => setCollapsed((v) => !v)}
+            className="flex items-center justify-center w-6 h-6 rounded transition-colors"
+            style={{
+              background: "rgba(30, 45, 74, 0.4)",
+              border: "1px solid rgba(30, 45, 74, 0.8)",
+              color: "#4a5568",
+            }}
+            title={collapsed ? "Expand" : "Collapse"}
+          >
             <svg
-              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3"
-              style={{ color: "#4a5568" }}
+              className="w-3.5 h-3.5 transition-transform"
+              style={{ transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)" }}
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
             >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              <polyline points="6 9 12 15 18 9" />
             </svg>
-            <input
-              type="text"
-              placeholder="Filter..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              className="pl-7 pr-3 py-1 rounded text-xs outline-none transition-colors w-28 focus:w-40"
-              style={{
-                background: "rgba(30, 45, 74, 0.5)",
-                border: "1px solid rgba(30, 45, 74, 0.8)",
-                color: "#e2e8f0",
-                transitionProperty: "width",
-                transitionDuration: "200ms",
-              }}
-              onFocus={(e) =>
-                (e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.4)")
-              }
-              onBlur={(e) =>
-                (e.currentTarget.style.borderColor = "rgba(30, 45, 74, 0.8)")
-              }
-            />
-          </div>
+          </button>
         </div>
       </div>
 
-      {/* Table */}
-      <div className="card overflow-hidden">
+      {/* Table — hidden when collapsed */}
+      {!collapsed && <div className="card overflow-hidden">
         {loading ? (
           <div className="animate-pulse p-4 space-y-3">
             {[1, 2, 3, 4].map((i) => (
@@ -272,7 +301,7 @@ export default function PortsPanel({
             </table>
           </div>
         )}
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,0 +1,38 @@
+{
+  "project": "marxpos",
+  "description": "MarxPOS Full E2E Regression Tests",
+  "test_cases": [
+    {
+      "id": "web_login",
+      "label": "Web Portal Login",
+      "task": "Go to https://web.dev.marxpos.com and log in using phone {{WEB_PHONE}} and password {{WEB_PASSWORD}}. Stop as soon as the authenticated dashboard or home screen is visible. Return 'SUCCESS' if login worked, otherwise describe what went wrong.",
+      "enabled": true,
+      "depends_on": null,
+      "skip_dependents_on_fail": true
+    },
+    {
+      "id": "web_smoke",
+      "label": "Web Portal Smoke Checks",
+      "task": "You are on https://web.dev.marxpos.com already logged in (phone={{WEB_PHONE}}, password={{WEB_PASSWORD}} if re-login needed). Open at least five distinct navigation modules, perform safe read-only interactions in each (search, filter, or open a detail view), and confirm there are no blocker errors. Return a short summary of every module checked and PASS/FAIL per module.",
+      "enabled": true,
+      "depends_on": "web_login",
+      "skip_dependents_on_fail": false
+    },
+    {
+      "id": "admin_login",
+      "label": "Admin Portal Login",
+      "task": "Go to https://admin.dev.marxpos.com and log in using username {{ADMIN_USERNAME}} and password {{ADMIN_PASSWORD}}. Stop as soon as the admin dashboard or home screen is visible. Return 'SUCCESS' if login worked, otherwise describe what went wrong.",
+      "enabled": true,
+      "depends_on": null,
+      "skip_dependents_on_fail": true
+    },
+    {
+      "id": "admin_smoke",
+      "label": "Admin Portal Smoke Checks",
+      "task": "You are on https://admin.dev.marxpos.com already logged in (username={{ADMIN_USERNAME}}, password={{ADMIN_PASSWORD}} if re-login needed). Open at least five distinct admin modules, perform safe read-only interactions in each, and confirm no blocker errors. Return a short summary of every module checked and PASS/FAIL per module.",
+      "enabled": true,
+      "depends_on": "admin_login",
+      "skip_dependents_on_fail": false
+    }
+  ]
+}

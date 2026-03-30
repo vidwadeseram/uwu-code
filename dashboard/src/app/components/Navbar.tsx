@@ -129,6 +129,28 @@ export default function Navbar() {
               Dashboard
             </Link>
 
+            <Link
+              href="/tests"
+              className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all hover:bg-white/5"
+              style={{ color: "#94a3b8" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#a855f7")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+            >
+              <svg
+                className="w-3.5 h-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="9 11 12 14 22 4" />
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+              </svg>
+              uwu-tester
+            </Link>
+
             {vpsIp && (
               <>
                 <a
@@ -170,44 +192,6 @@ export default function Navbar() {
                   </svg>
                 </a>
 
-                <a
-                  href="https://code.vidwadeseram.com:8443"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all hover:bg-white/5"
-                  style={{ color: "#94a3b8" }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.color = "#00d4ff")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.color = "#94a3b8")
-                  }
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8l4 4-4 4M8 12h8" />
-                  </svg>
-                  Skyvern
-                  <svg
-                    className="w-3 h-3 opacity-50"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                </a>
               </>
             )}
 

@@ -1,6 +1,6 @@
-# VPS Dev Dashboard
+# uwu-tester
 
-A web-based development environment dashboard for your VPS. Manage tmux sessions, track ports, expose services, and access a browser-based terminal — all from one place.
+A web-based VPS development dashboard with integrated browser-use regression testing.
 
 ## Features
 
@@ -8,7 +8,8 @@ A web-based development environment dashboard for your VPS. Manage tmux sessions
 - **Tmux Session Viewer** — see all sessions, windows, and working directories in real time
 - **Port Tracker** — all listening ports with process names, PIDs, and session correlation
 - **Expose Ports** — one-click to open a firewall rule and get the public URL for any port
-- **Skyvern Integration** — navbar shortcut to your Skyvern instance
+- **Projects Panel** — scan, clone, and manage git repos from `/opt/projects`
+- **uwu-tester** — per-project browser-use regression tests with a built-in editor and results viewer
 - **System Stats** — CPU, memory, disk, load average, uptime at a glance
 
 ## Install (single command)
@@ -16,75 +17,73 @@ A web-based development environment dashboard for your VPS. Manage tmux sessions
 Run on your VPS as root:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/vidwadeseram/vps-dev-dashboard/main/install.sh | sudo bash
+curl -sSL https://raw.githubusercontent.com/vidwadeseram/uwu-tester/main/install.sh | sudo bash
 ```
 
-That's it. The script will:
-1. Install Node.js 20, ttyd, nginx, tmux, ufw
+The script will:
+1. Install Node.js 20, ttyd, nginx, tmux, ufw, uv
 2. Clone this repo to `/opt/vps-dashboard`
-3. Build the Next.js dashboard
-4. Create and start `systemd` services for the dashboard and terminal
-5. Configure nginx as a reverse proxy on port 80
-6. Open the necessary firewall ports
+3. Install browser-use + Playwright for regression tests
+4. Build the Next.js dashboard
+5. Create and start `systemd` services for the dashboard and terminal
+6. Configure nginx as a reverse proxy on port 80
 
 After install, visit `http://YOUR_VPS_IP` in your browser.
 
-### Custom ports
+## Regression Tests (uwu-tester)
 
-```bash
-DASHBOARD_PORT=4000 TERMINAL_PORT=8080 curl -sSL ... | sudo bash
+Test cases are stored as JSON files, one per project:
+
+```
+regression_tests/
+  test_cases/
+    marxpos.json       ← test cases for marxpos project
+    myproject.json     ← test cases for myproject
+  results/
+    marxpos/
+      20240101T120000Z.json   ← run results
+  test_runner.py             ← browser-use runner
+  pyproject.toml
 ```
 
-## Workflow
-
-1. **SSH into your VPS**, clone a project, start a tmux session:
-   ```bash
-   git clone https://github.com/you/myproject
-   tmux new -s myproject
-   cd myproject && npm start
-   ```
-
-2. **Open the dashboard** at `http://YOUR_VPS_IP` — your tmux session appears with the working directory and any ports it's using.
-
-3. **Click Expose** on a port to get the public URL and optionally open it in the firewall.
-
-4. **Use the Terminal** link for a full browser-based terminal when you don't have SSH handy.
-
-## Services
-
-| Service | Default Port | Description |
-|---------|-------------|-------------|
-| Dashboard | 3000 (proxied via :80) | Next.js dashboard |
-| ttyd | 7681 (proxied via :80/terminal/) | Browser terminal |
-| Skyvern | 8000 | Start separately |
-
-### Manage services
+### Running tests manually
 
 ```bash
-systemctl status vps-dashboard
-systemctl status vps-ttyd
-systemctl restart vps-dashboard
-journalctl -u vps-dashboard -f
+cd /opt/vps-dashboard/regression_tests
+ANTHROPIC_API_KEY=sk-ant-... uv run test_runner.py marxpos
 ```
 
-### Update
+Pass credentials as env vars or `KEY=VALUE` args:
 
 ```bash
-cd /opt/vps-dashboard
-git pull --recurse-submodules
-cd dashboard && npm ci && npm run build
-systemctl restart vps-dashboard
+uv run test_runner.py marxpos WEB_PHONE=+1234567890 WEB_PASSWORD=secret
 ```
 
-## Local development
+### Test case JSON format
 
-```bash
-git clone --recurse-submodules https://github.com/vidwadeseram/vps-dev-dashboard
-cd vps-dev-dashboard/dashboard
-npm install
-npm run dev   # http://localhost:3000
+```json
+{
+  "project": "myproject",
+  "description": "My project E2E tests",
+  "test_cases": [
+    {
+      "id": "login",
+      "label": "Login",
+      "task": "Go to {{BASE_URL}} and log in with {{EMAIL}} / {{PASSWORD}}. Return SUCCESS when authenticated.",
+      "enabled": true,
+      "depends_on": null,
+      "skip_dependents_on_fail": true
+    }
+  ]
+}
 ```
 
-## Submodules
+Use `{{VAR}}` placeholders — they're substituted from environment variables at run time.
 
-- **[skyvern](skyvern/)** — [Skyvern-AI/skyvern](https://github.com/Skyvern-AI/skyvern): AI-powered browser automation agent. Follow Skyvern's own setup instructions to run it.
+### Dashboard UI
+
+The `/tests` page in the dashboard lets you:
+- Create / select projects
+- Add, edit, delete, enable/disable, and reorder test cases
+- Trigger a test run with one click
+- View results for all recent runs

@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import SystemHeader from "./components/SystemHeader";
 import SessionsPanel from "./components/SessionsPanel";
 import PortsPanel from "./components/PortsPanel";
+import CorePanel from "./components/CorePanel";
+import ProjectsPanel from "./components/ProjectsPanel";
 import ExposeModal from "./components/ExposeModal";
 
 export interface SystemData {
@@ -50,6 +52,42 @@ export interface ExposeResult {
   url: string;
   message: string;
   ufwOutput?: string;
+}
+
+export interface CoreService {
+  name: string;
+  status: string;
+  active: boolean;
+}
+
+export interface CoreContainer {
+  name: string;
+  status: string;
+  ports: string;
+}
+
+export interface CoreData {
+  services: CoreService[];
+  containers: CoreContainer[];
+  uptime: string;
+}
+
+export interface ProjectInfo {
+  name: string;
+  path: string;
+  lastModified: string;
+  branch: string;
+  remoteUrl: string;
+}
+
+export interface ProjectGroup {
+  name: string;
+  path: string;
+  projects: ProjectInfo[];
+}
+
+export interface ProjectsData {
+  groups: ProjectGroup[];
 }
 
 /**
@@ -129,6 +167,8 @@ export default function DashboardPage() {
   const [systemData, setSystemData] = useState<SystemData | null>(null);
   const [sessions, setSessions] = useState<TmuxSession[]>([]);
   const [ports, setPorts] = useState<PortInfo[]>([]);
+  const [coreData, setCoreData] = useState<CoreData | null>(null);
+  const [projectsData, setProjectsData] = useState<ProjectsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -150,11 +190,14 @@ export default function DashboardPage() {
     if (isManual) setRefreshing(true);
 
     try {
-      const [sysRes, sessRes, portsRes] = await Promise.allSettled([
-        fetch("/api/system"),
-        fetch("/api/sessions"),
-        fetch("/api/ports"),
-      ]);
+      const [sysRes, sessRes, portsRes, coreRes, projectsRes] =
+        await Promise.allSettled([
+          fetch("/api/system"),
+          fetch("/api/sessions"),
+          fetch("/api/ports"),
+          fetch("/api/core"),
+          fetch("/api/projects"),
+        ]);
 
       if (!isMounted.current) return;
 
@@ -175,6 +218,16 @@ export default function DashboardPage() {
         const rawPorts: PortInfo[] = data.ports ?? [];
         const correlated = correlatePorts(rawPorts, fetchedSessions);
         setPorts(correlated);
+      }
+
+      if (coreRes.status === "fulfilled" && coreRes.value.ok) {
+        const data = await coreRes.value.json();
+        setCoreData(data);
+      }
+
+      if (projectsRes.status === "fulfilled" && projectsRes.value.ok) {
+        const data = await projectsRes.value.json();
+        setProjectsData(data);
       }
 
       setLastRefresh(new Date());
@@ -233,7 +286,7 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-screen-2xl mx-auto px-4 py-6 space-y-6">
-      {/* System Header */}
+      {/* Row 1: System Header (full width) */}
       <SystemHeader
         data={systemData}
         loading={loading}
@@ -242,23 +295,24 @@ export default function DashboardPage() {
         onRefresh={() => fetchAll(true)}
       />
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Sessions Panel */}
-        <SessionsPanel
-          sessions={sessions}
-          ports={ports}
-          loading={loading}
-        />
-
-        {/* Ports Panel */}
+      {/* Row 2: Core Panel (full width, starts collapsed) */}
+      <CorePanel data={coreData} defaultCollapsed={true}>
         <PortsPanel
           ports={ports}
           loading={loading}
           publicIp={systemData?.publicIp ?? ""}
           onExpose={handleExpose}
+          defaultCollapsed={true}
         />
-      </div>
+      </CorePanel>
+
+      <SessionsPanel sessions={sessions} ports={ports} loading={loading} />
+
+      {/* Row 4: Projects Panel (full width) */}
+      <ProjectsPanel
+        data={projectsData}
+        onRefresh={() => fetchAll(true)}
+      />
 
       {/* Expose Modal */}
       {exposePort && (
