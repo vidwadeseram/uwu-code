@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# VPS Dev Dashboard - Single-command installer
-# Usage: curl -sSL https://raw.githubusercontent.com/vidwadeseram/vps-dev-dashboard/main/install.sh | bash
+# uwu-tester - VPS Dev Dashboard installer
+# Usage: curl -sSL https://raw.githubusercontent.com/vidwadeseram/uwu-tester/main/install.sh | bash
 set -euo pipefail
 
 ###############################################################################
 # Config
 ###############################################################################
-REPO_URL="https://github.com/vidwadeseram/vps-dev-dashboard.git"
+REPO_URL="https://github.com/vidwadeseram/uwu-tester.git"
 INSTALL_DIR="${INSTALL_DIR:-/opt/vps-dashboard}"
 DASHBOARD_PORT="${DASHBOARD_PORT:-3000}"
 TERMINAL_PORT="${TERMINAL_PORT:-7681}"

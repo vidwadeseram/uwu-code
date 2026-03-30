@@ -132,7 +132,7 @@ export default function Navbar() {
             {vpsIp && (
               <>
                 <a
-                  href={`http://${vpsIp}:7681`}
+                  href="http://code.vidwadeseram.com/terminal/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all hover:bg-white/5"
@@ -171,7 +171,7 @@ export default function Navbar() {
                 </a>
 
                 <a
-                  href={`http://${vpsIp}:8000`}
+                  href="http://code.vidwadeseram.com:8080"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all hover:bg-white/5"
