@@ -294,9 +294,35 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+###############################################################################
+# openclaw agent setup
+###############################################################################
+info "Setting up openclaw agent..."
+cd "$INSTALL_DIR/openclaw"
+mkdir -p data
+uv sync 2>/dev/null || uv pip install anthropic openai 2>/dev/null || true
+
+cat > /etc/systemd/system/vps-openclaw.service << EOF
+[Unit]
+Description=openclaw autonomous task agent
+After=network.target vps-dashboard.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=$INSTALL_DIR/openclaw
+EnvironmentFile=-$INSTALL_DIR/regression_tests/.env
+ExecStart=$(which uv 2>/dev/null || echo "$HOME/.cargo/bin/uv") run agent.py
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
-systemctl enable vps-dashboard vps-ttyd
-systemctl restart vps-dashboard vps-ttyd
+systemctl enable vps-dashboard vps-ttyd vps-openclaw
+systemctl restart vps-dashboard vps-ttyd vps-openclaw
 success "Services started."
 
 ###############################################################################
@@ -387,14 +413,12 @@ echo -e "${GREEN}╚════════════════════
 echo ""
 echo -e "  Dashboard:  ${CYAN}${DASHBOARD_URL}${NC}"
 echo -e "  Terminal:   ${CYAN}${TERMINAL_URL}${NC}"
-echo -e "  Tests UI:   ${CYAN}${DASHBOARD_URL}/tests${NC}"
-echo ""
-echo -e "  Run regression tests manually:"
-echo -e "    ${YELLOW}cd $INSTALL_DIR/regression_tests${NC}"
-echo -e "    ${YELLOW}uv run test_runner.py marxpos${NC}"
+echo -e "  Tests:      ${CYAN}${DASHBOARD_URL}/tests${NC}"
+echo -e "  Scheduler:  ${CYAN}${DASHBOARD_URL}/scheduler${NC}"
+echo -e "  OpenClaw:   ${CYAN}${DASHBOARD_URL}/openclaw${NC}"
 echo ""
 echo -e "  Manage:"
-echo -e "    ${YELLOW}systemctl status vps-dashboard${NC}"
+echo -e "    ${YELLOW}systemctl status vps-dashboard vps-openclaw${NC}"
 echo ""
 echo -e "  Update:"
 echo -e "    ${YELLOW}cd $INSTALL_DIR && git pull && cd dashboard && npm ci && npm run build && systemctl restart vps-dashboard${NC}"

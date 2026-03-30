@@ -1,0 +1,9 @@
+[project]
+name = "openclaw"
+version = "0.1.0"
+description = "Autonomous task agent - uses opencode/claude for coding, LLM API for research"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40",
+    "openai>=1.0",
+]
