@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   if (!project) {
     // Return list of available slugs
     const files = fs.existsSync(TEST_CASES_DIR)
-      ? fs.readdirSync(TEST_CASES_DIR).filter((f) => f.endsWith(".json"))
+      ? fs.readdirSync(TEST_CASES_DIR).filter((f) => /^[a-zA-Z0-9_-]+\.json$/.test(f))
       : [];
     const slugs = files.map((f) => f.replace(/\.json$/, ""));
     return NextResponse.json({ projects: slugs });

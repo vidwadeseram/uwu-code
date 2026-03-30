@@ -98,11 +98,11 @@ apt-get update -qq
 
 info "Installing system dependencies..."
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-  curl wget git tmux build-essential \
+  curl wget git tmux neovim build-essential \
   ufw net-tools iproute2 \
   nginx certbot python3-certbot-nginx \
   cmake libjson-c-dev libwebsockets-dev \
-  ca-certificates gnupg python3-pip 2>/dev/null || true
+  ca-certificates gnupg python3-pip stow 2>/dev/null || true
 
 success "System packages installed."
 
@@ -130,6 +130,50 @@ if ! command -v ttyd &>/dev/null; then
   success "ttyd ${TTYD_VER} installed."
 else
   success "ttyd already installed."
+fi
+
+###############################################################################
+# Dotfiles (neovim, tmux, shell configs from vidwadeseram/dotfiles)
+###############################################################################
+DOTFILES_DIR="$HOME/.dotfiles"
+if [ -d "$DOTFILES_DIR/.git" ]; then
+  info "Dotfiles already cloned, pulling latest..."
+  git -C "$DOTFILES_DIR" pull -q
+else
+  info "Cloning dotfiles..."
+  git clone --depth=1 "https://github.com/vidwadeseram/dotfiles.git" "$DOTFILES_DIR" -q
+fi
+# Apply dotfiles with stow (symlink all packages into $HOME)
+cd "$DOTFILES_DIR"
+for pkg in */; do
+  pkg="${pkg%/}"
+  [ -f "$pkg/.stow-skip" ] && continue
+  stow --restow --target="$HOME" "$pkg" 2>/dev/null || true
+done
+cd -
+success "Dotfiles applied."
+
+###############################################################################
+# Claude Code CLI
+###############################################################################
+if ! command -v claude &>/dev/null; then
+  info "Installing Claude Code..."
+  npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
+  success "Claude Code installed."
+else
+  success "Claude Code already installed."
+fi
+
+###############################################################################
+# OpenCode
+###############################################################################
+if ! command -v opencode &>/dev/null; then
+  info "Installing OpenCode..."
+  curl -fsSL https://opencode.ai/install | sh >/dev/null 2>&1 || \
+    npm install -g opencode-ai >/dev/null 2>&1 || true
+  success "OpenCode installed (if supported on this arch)."
+else
+  success "OpenCode already installed."
 fi
 
 ###############################################################################
@@ -232,6 +276,7 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
+mkdir -p /opt/workspaces
 cat > /etc/systemd/system/vps-ttyd.service << EOF
 [Unit]
 Description=uwu-tester Browser Terminal (ttyd)
@@ -240,7 +285,8 @@ After=network.target
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/local/bin/ttyd --port $TERMINAL_PORT --writable /bin/bash
+WorkingDirectory=/opt/workspaces
+ExecStart=/usr/local/bin/ttyd --port $TERMINAL_PORT --writable bash -c 'cd /opt/workspaces && exec bash'
 Restart=on-failure
 RestartSec=5
 
