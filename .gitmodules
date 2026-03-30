@@ -1,0 +1,3 @@
+[submodule "skyvern"]
+	path = skyvern
+	url = https://github.com/Skyvern-AI/skyvern

@@ -1,0 +1,276 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import SystemHeader from "./components/SystemHeader";
+import SessionsPanel from "./components/SessionsPanel";
+import PortsPanel from "./components/PortsPanel";
+import ExposeModal from "./components/ExposeModal";
+
+export interface SystemData {
+  publicIp: string;
+  hostname: string;
+  uptime: string;
+  loadAvg: string;
+  memory: { total: number; used: number; free: number; percent: number };
+  cpu: { model: string; count: number };
+  disk: string;
+  platform: string;
+}
+
+export interface TmuxWindow {
+  windowIndex: number;
+  windowName: string;
+  active: boolean;
+  cwd: string;
+  panePid: number | null;
+}
+
+export interface TmuxSession {
+  name: string;
+  windowCount: number;
+  created: number;
+  windows: TmuxWindow[];
+}
+
+export interface PortInfo {
+  port: number;
+  address: string;
+  pid: number | null;
+  processName: string;
+  protocol: string;
+  cwd: string;
+  ancestorPids: number[];
+  // Matched session info (set client-side)
+  matchedSession?: string;
+  matchedWindow?: string;
+}
+
+export interface ExposeResult {
+  success: boolean;
+  url: string;
+  message: string;
+  ufwOutput?: string;
+}
+
+/**
+ * Try to correlate ports with tmux sessions.
+ * Strategy 1: CWD match — port process CWD starts with or equals a tmux window CWD.
+ * Strategy 2: Ancestor walk — check if any ancestor PID of the port process matches a pane PID.
+ */
+function correlatePorts(
+  ports: PortInfo[],
+  sessions: TmuxSession[]
+): PortInfo[] {
+  // Build a map: panePid -> { sessionName, windowName }
+  const paneMap = new Map<
+    number,
+    { sessionName: string; windowName: string }
+  >();
+  // Build an array of { cwd, sessionName, windowName } for CWD matching
+  const cwdEntries: { cwd: string; sessionName: string; windowName: string }[] =
+    [];
+
+  for (const session of sessions) {
+    for (const window of session.windows) {
+      if (window.panePid) {
+        paneMap.set(window.panePid, {
+          sessionName: session.name,
+          windowName: window.windowName,
+        });
+      }
+      if (window.cwd) {
+        cwdEntries.push({
+          cwd: window.cwd,
+          sessionName: session.name,
+          windowName: window.windowName,
+        });
+      }
+    }
+  }
+
+  return ports.map((port) => {
+    // Strategy 1: CWD match
+    if (port.cwd) {
+      const match = cwdEntries.find(
+        (e) =>
+          e.cwd &&
+          (port.cwd === e.cwd ||
+            port.cwd.startsWith(e.cwd + "/") ||
+            e.cwd.startsWith(port.cwd + "/"))
+      );
+      if (match) {
+        return {
+          ...port,
+          matchedSession: match.sessionName,
+          matchedWindow: match.windowName,
+        };
+      }
+    }
+
+    // Strategy 2: Ancestor PID match
+    if (port.ancestorPids && port.ancestorPids.length > 0) {
+      for (const ancestorPid of port.ancestorPids) {
+        const match = paneMap.get(ancestorPid);
+        if (match) {
+          return {
+            ...port,
+            matchedSession: match.sessionName,
+            matchedWindow: match.windowName,
+          };
+        }
+      }
+    }
+
+    return port;
+  });
+}
+
+export default function DashboardPage() {
+  const [systemData, setSystemData] = useState<SystemData | null>(null);
+  const [sessions, setSessions] = useState<TmuxSession[]>([]);
+  const [ports, setPorts] = useState<PortInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Expose modal state
+  const [exposePort, setExposePort] = useState<PortInfo | null>(null);
+  const [exposeResult, setExposeResult] = useState<ExposeResult | null>(null);
+  const [exposeLoading, setExposeLoading] = useState(false);
+
+  const isMounted = useRef(true);
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const fetchAll = useCallback(async (isManual = false) => {
+    if (isManual) setRefreshing(true);
+
+    try {
+      const [sysRes, sessRes, portsRes] = await Promise.allSettled([
+        fetch("/api/system"),
+        fetch("/api/sessions"),
+        fetch("/api/ports"),
+      ]);
+
+      if (!isMounted.current) return;
+
+      if (sysRes.status === "fulfilled" && sysRes.value.ok) {
+        const data = await sysRes.value.json();
+        setSystemData(data);
+      }
+
+      let fetchedSessions: TmuxSession[] = [];
+      if (sessRes.status === "fulfilled" && sessRes.value.ok) {
+        const data = await sessRes.value.json();
+        fetchedSessions = data.sessions ?? [];
+        setSessions(fetchedSessions);
+      }
+
+      if (portsRes.status === "fulfilled" && portsRes.value.ok) {
+        const data = await portsRes.value.json();
+        const rawPorts: PortInfo[] = data.ports ?? [];
+        const correlated = correlatePorts(rawPorts, fetchedSessions);
+        setPorts(correlated);
+      }
+
+      setLastRefresh(new Date());
+    } catch (err) {
+      console.error("Fetch error:", err);
+    } finally {
+      if (isMounted.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
+
+  // Auto-refresh every 10 seconds
+  useEffect(() => {
+    const interval = setInterval(() => fetchAll(), 10000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  // Handle expose port
+  const handleExpose = (port: PortInfo) => {
+    setExposePort(port);
+    setExposeResult(null);
+  };
+
+  const handleExposeSubmit = async (port: PortInfo) => {
+    setExposeLoading(true);
+    try {
+      const res = await fetch("/api/expose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ port: port.port }),
+      });
+      const data: ExposeResult = await res.json();
+      setExposeResult(data);
+    } catch {
+      setExposeResult({
+        success: false,
+        url: `http://${systemData?.publicIp ?? "YOUR_VPS_IP"}:${port.port}`,
+        message: "Failed to contact API",
+      });
+    } finally {
+      setExposeLoading(false);
+    }
+  };
+
+  const handleExposeClose = () => {
+    setExposePort(null);
+    setExposeResult(null);
+  };
+
+  return (
+    <div className="max-w-screen-2xl mx-auto px-4 py-6 space-y-6">
+      {/* System Header */}
+      <SystemHeader
+        data={systemData}
+        loading={loading}
+        lastRefresh={lastRefresh}
+        refreshing={refreshing}
+        onRefresh={() => fetchAll(true)}
+      />
+
+      {/* Main Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Sessions Panel */}
+        <SessionsPanel
+          sessions={sessions}
+          ports={ports}
+          loading={loading}
+        />
+
+        {/* Ports Panel */}
+        <PortsPanel
+          ports={ports}
+          loading={loading}
+          publicIp={systemData?.publicIp ?? ""}
+          onExpose={handleExpose}
+        />
+      </div>
+
+      {/* Expose Modal */}
+      {exposePort && (
+        <ExposeModal
+          port={exposePort}
+          result={exposeResult}
+          loading={exposeLoading}
+          publicIp={systemData?.publicIp ?? "YOUR_VPS_IP"}
+          onClose={handleExposeClose}
+          onExpose={() => handleExposeSubmit(exposePort)}
+        />
+      )}
+    </div>
+  );
+}
