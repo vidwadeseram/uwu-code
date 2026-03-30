@@ -181,6 +181,20 @@ export default function Navbar() {
               OpenClaw
             </Link>
 
+            <Link
+              href="/settings"
+              className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all hover:bg-white/5"
+              style={{ color: "#94a3b8" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#00d4ff")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+            >
+              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" />
+              </svg>
+              Settings
+            </Link>
+
             {vpsIp && (
               <>
                 <a

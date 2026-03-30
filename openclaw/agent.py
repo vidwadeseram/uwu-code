@@ -194,10 +194,31 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
     desc = task["description"]
     log("  → running research via LLM API")
 
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    openai_key    = os.environ.get("OPENAI_API_KEY", "").strip()
+    anthropic_key  = os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    openai_key     = os.environ.get("OPENAI_API_KEY", "").strip()
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
 
+    # ── 1. OpenRouter (preferred — most flexible, access to many models) ──────
+    if openrouter_key:
+        try:
+            import openai as oai
+            client = oai.OpenAI(
+                api_key=openrouter_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+            resp = client.chat.completions.create(
+                model="anthropic/claude-opus-4",
+                messages=[{"role": "user", "content": desc}],
+            )
+            return True, resp.choices[0].message.content or ""
+        except Exception as e:
+            err = str(e)
+            log(f"  OpenRouter error: {err[:200]}")
+            if is_rate_limited(err):
+                return None, err
+            # fall through to Anthropic direct
+
+    # ── 2. Anthropic direct ───────────────────────────────────────────────────
     if anthropic_key:
         try:
             import anthropic
@@ -213,31 +234,20 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
             log(f"  Anthropic error: {err[:200]}")
             if is_rate_limited(err):
                 return None, err
-            # fall through to next provider
 
-    base_url = None
-    model = "gpt-4o"
-    key = openai_key
-    if openrouter_key:
-        key = openrouter_key
-        base_url = "https://openrouter.ai/api/v1"
-        model = "openai/gpt-4o"
-
-    if key:
+    # ── 3. OpenAI direct ──────────────────────────────────────────────────────
+    if openai_key:
         try:
             import openai as oai
-            kwargs = {"api_key": key}
-            if base_url:
-                kwargs["base_url"] = base_url
-            client = oai.OpenAI(**kwargs)
+            client = oai.OpenAI(api_key=openai_key)
             resp = client.chat.completions.create(
-                model=model,
+                model="gpt-4o",
                 messages=[{"role": "user", "content": desc}],
             )
             return True, resp.choices[0].message.content or ""
         except Exception as e:
             err = str(e)
-            log(f"  OpenAI/OpenRouter error: {err[:200]}")
+            log(f"  OpenAI error: {err[:200]}")
             if is_rate_limited(err):
                 return None, err
 
