@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
-import { readEnvKeys } from "@/app/lib/settings";
+import { readEnvKeys, readSettings } from "@/app/lib/settings";
 
 const SYSTEM = `You are openclaw, an AI assistant built into a VPS development dashboard.
 You help with coding, debugging, server management, research, and anything the developer needs.
@@ -25,7 +25,12 @@ export async function POST(req: NextRequest) {
   const anthropicKey  = keys.ANTHROPIC_API_KEY;
   const openaiKey     = keys.OPENAI_API_KEY;
 
+  // Read model preference from settings.json
+  const settings = readSettings();
+  const openrouterModel = settings.models?.openclaw ?? "anthropic/claude-3-5-haiku";
+
   const full: ChatMessage[] = [{ role: "system", content: SYSTEM }, ...messages];
+  let lastError = "";
 
   // ── 1. OpenRouter ─────────────────────────────────────────────────────────
   if (openrouterKey) {
@@ -38,13 +43,17 @@ export async function POST(req: NextRequest) {
           "HTTP-Referer": "https://vpsdev.local",
           "X-Title": "openclaw",
         },
-        body: JSON.stringify({ model: "anthropic/claude-opus-4", messages: full, max_tokens: 4096 }),
+        body: JSON.stringify({ model: openrouterModel, messages: full, max_tokens: 4096 }),
       });
       if (res.ok) {
         const data = await res.json();
         return NextResponse.json({ message: data.choices[0].message.content });
       }
-    } catch { /* fall through */ }
+      const errData = await res.json().catch(() => ({}));
+      lastError = errData?.error?.message ?? `OpenRouter error ${res.status}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
   }
 
   // ── 2. Anthropic direct ───────────────────────────────────────────────────
@@ -58,7 +67,7 @@ export async function POST(req: NextRequest) {
           "content-type": "application/json",
         },
         body: JSON.stringify({
-          model: "claude-opus-4-5-20251101",
+          model: "claude-3-5-haiku-20241022",
           max_tokens: 4096,
           system: SYSTEM,
           messages: messages.filter((m) => m.role !== "system"),
@@ -68,7 +77,11 @@ export async function POST(req: NextRequest) {
         const data = await res.json();
         return NextResponse.json({ message: data.content[0].text });
       }
-    } catch { /* fall through */ }
+      const errData = await res.json().catch(() => ({}));
+      lastError = errData?.error?.message ?? `Anthropic error ${res.status}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
   }
 
   // ── 3. OpenAI direct ──────────────────────────────────────────────────────
@@ -77,17 +90,28 @@ export async function POST(req: NextRequest) {
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${openaiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "gpt-4o", messages: full, max_tokens: 4096 }),
+        body: JSON.stringify({ model: "gpt-4o-mini", messages: full, max_tokens: 4096 }),
       });
       if (res.ok) {
         const data = await res.json();
         return NextResponse.json({ message: data.choices[0].message.content });
       }
-    } catch { /* fall through */ }
+      const errData = await res.json().catch(() => ({}));
+      lastError = errData?.error?.message ?? `OpenAI error ${res.status}`;
+    } catch (e) {
+      lastError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  if (!openrouterKey && !anthropicKey && !openaiKey) {
+    return NextResponse.json(
+      { error: "No API key configured. Add one in Settings (/settings)." },
+      { status: 503 }
+    );
   }
 
   return NextResponse.json(
-    { error: "No API key configured. Add one in Settings (/settings)." },
+    { error: lastError || "All providers failed. Check your API keys and credits in Settings." },
     { status: 503 }
   );
 }
