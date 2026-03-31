@@ -39,7 +39,7 @@ function McpModal({
       mcpServers: {
         "uwu-tester": {
           type: "stdio",
-          command: "uv",
+          command: "/usr/local/bin/uv",
           args: ["run", "mcp_server.py"],
           cwd: dir,
         },
@@ -53,7 +53,7 @@ function McpModal({
     {
       mcp: {
         "uwu-tester": {
-          command: ["uv", "run", "mcp_server.py"],
+          command: ["/usr/local/bin/uv", "run", "mcp_server.py"],
           cwd: dir,
         },
       },
@@ -62,8 +62,9 @@ function McpModal({
     2
   );
 
-  const claudeCmd = `claude --dangerously-skip-permissions --mcp-config /path/to/.mcp.json "Use the uwu-tester MCP server to run tests for the '${project}' project, then give me a detailed pass/fail report for each test case."`;
-  const opencodeCmd = `opencode "Use the uwu-tester MCP server to run tests for the '${project}' project, then give me a detailed pass/fail report for each test case."`;
+  // Run as non-root uwu user — claude refuses --dangerously-skip-permissions as root
+  const claudeCmd = `sudo -u uwu claude --dangerously-skip-permissions --mcp-config /home/uwu/.mcp.json "Use the uwu-tester MCP server to run tests for the '${project}' project, then give me a detailed pass/fail report for each test case."`;
+  const opencodeCmd = `sudo -u uwu opencode "Use the uwu-tester MCP server to run tests for the '${project}' project, then give me a detailed pass/fail report for each test case."`;
 
   const isClaudeCode = target === "claude";
   const accent = isClaudeCode ? "#f97316" : "#a855f7";
@@ -79,8 +80,8 @@ function McpModal({
   );
 
   const configBlock = isClaudeCode ? mcpJsonConfig : opencodeMcpConfig;
-  const configKey = isClaudeCode ? "Add to .mcp.json in your project root" : "Add to ~/.config/opencode/config.json";
-  const cmdKey = isClaudeCode ? "Run in terminal" : "Run in terminal";
+  const configKey = isClaudeCode ? "Save to /home/uwu/.mcp.json" : "Save to /home/uwu/.config/opencode/config.json";
+  const cmdKey = isClaudeCode ? "Run in terminal (as root)" : "Run in terminal (as root)";
   const cmd = isClaudeCode ? claudeCmd : opencodeCmd;
 
   function CodeBlock({ text, copyKey, label }: { text: string; copyKey: string; label: string }) {

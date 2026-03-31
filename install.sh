@@ -192,10 +192,12 @@ chmod 440 /etc/sudoers.d/uwu-agents
 # Give uwu write access to the dirs it needs
 # (regression_tests for running/reading tests; workspaces for project files)
 mkdir -p "$INSTALL_DIR/regression_tests/results"
+mkdir -p "$INSTALL_DIR/openclaw/data"
 chmod -R a+rX "$INSTALL_DIR"
 chmod -R a+w  "$INSTALL_DIR/regression_tests/results"
 chmod -R a+w  "$INSTALL_DIR/regression_tests/test_cases"
-chmod    a+w  "$INSTALL_DIR/settings.json" 2>/dev/null || true
+chmod -R a+w  "$INSTALL_DIR/openclaw/data"
+chmod    a+rw "$INSTALL_DIR/settings.json" 2>/dev/null || true
 
 # Ensure opencode config dir exists for uwu
 mkdir -p /home/uwu/.config/opencode
@@ -349,6 +351,13 @@ cd "$INSTALL_DIR/openclaw"
 mkdir -p data
 uv sync 2>/dev/null || uv pip install anthropic openai 2>/dev/null || true
 
+# Hand .venv and data ownership to uwu so it can write when running as that user
+chown -R uwu:uwu "$INSTALL_DIR/openclaw/.venv" 2>/dev/null || true
+chown -R uwu:uwu "$INSTALL_DIR/openclaw/data"  2>/dev/null || true
+
+# Same for regression_tests .venv — uwu runs test_runner.py via uv
+chown -R uwu:uwu "$INSTALL_DIR/regression_tests/.venv" 2>/dev/null || true
+
 cat > /etc/systemd/system/vps-openclaw.service << EOF
 [Unit]
 Description=openclaw autonomous task agent
@@ -358,6 +367,7 @@ After=network.target vps-dashboard.service
 Type=simple
 User=uwu
 WorkingDirectory=$INSTALL_DIR/openclaw
+Environment=HOME=/home/uwu
 EnvironmentFile=-$INSTALL_DIR/regression_tests/.env
 ExecStart=/usr/local/bin/uv-uwu run agent.py
 Restart=on-failure
