@@ -29,6 +29,7 @@ function McpModal({
   const [copied, setCopied] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoError, setAutoError] = useState("");
+  const [autoInfo, setAutoInfo] = useState("");
 
   useEffect(() => {
     fetch("/api/tests/mcp-info")
@@ -134,6 +135,7 @@ function McpModal({
     }
     setAutoRunning(true);
     setAutoError("");
+    setAutoInfo("");
     try {
       const res = isApi
         ? await fetch(`/api/tests/run?project=${encodeURIComponent(project)}`, {
@@ -160,7 +162,7 @@ function McpModal({
       } else {
         const runId = String(data.run_id ?? "");
         onBackgroundStarted({ target, runId, project });
-        onClose();
+        setAutoInfo(`Started in background${runId ? ` · ${runId}` : ""}.`);
       }
     } catch {
       setAutoError("Network error while running agent");
@@ -275,6 +277,11 @@ function McpModal({
           {autoError && (
             <div className="text-xs px-2 py-1 rounded" style={{ background: "rgba(255,68,68,0.1)", color: "#ff4444", border: "1px solid rgba(255,68,68,0.2)" }}>
               {autoError}
+            </div>
+          )}
+          {autoInfo && (
+            <div className="text-xs px-2 py-1 rounded" style={{ background: "rgba(0,255,136,0.1)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.2)" }}>
+              {autoInfo}
             </div>
           )}
         </div>
