@@ -1470,6 +1470,86 @@ export default function TestsPage() {
             </div>
           ) : (
             <>
+              <div className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#4a5568" }}>
+                  Run Scope
+                </span>
+                <div className="grid sm:grid-cols-3 gap-2">
+                  <button onClick={() => setRunMode("all")} className="px-3 py-1.5 rounded text-xs" style={BTN(runMode === "all", "#00ff88")}>All enabled cases</button>
+                  <button onClick={() => setRunMode("workflows")} className="px-3 py-1.5 rounded text-xs" style={BTN(runMode === "workflows", "#a855f7")}>Selected workflows</button>
+                  <button onClick={() => setRunMode("cases")} className="px-3 py-1.5 rounded text-xs" style={BTN(runMode === "cases", "#00d4ff")}>Selected cases</button>
+                </div>
+
+                {runMode === "workflows" && config && (
+                  <div className="flex flex-wrap gap-2">
+                    {config.workflows.map((wf) => (
+                      <button
+                        key={wf.id}
+                        onClick={() =>
+                          setSelectedWorkflowIds((prev) =>
+                            prev.includes(wf.id) ? prev.filter((v) => v !== wf.id) : [...prev, wf.id]
+                          )
+                        }
+                        className="px-2 py-1 rounded text-xs font-mono"
+                        style={BTN(selectedWorkflowIds.includes(wf.id), "#a855f7")}
+                      >
+                        {wf.id}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {runMode === "cases" && config && (
+                  <div className="flex flex-wrap gap-2">
+                    {config.test_cases.map((tc) => (
+                      <button
+                        key={tc.id}
+                        onClick={() =>
+                          setSelectedCaseIds((prev) =>
+                            prev.includes(tc.id) ? prev.filter((v) => v !== tc.id) : [...prev, tc.id]
+                          )
+                        }
+                        className="px-2 py-1 rounded text-xs font-mono"
+                        style={BTN(selectedCaseIds.includes(tc.id), "#00d4ff")}
+                      >
+                        {tc.id}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <p className="text-xs" style={{ color: "#4a5568" }}>
+                  Effective run order: {resolvedRunCaseIds.length > 0 ? resolvedRunCaseIds.join(" → ") : "None selected"}
+                </p>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setMcpModal("api")}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={BTN(true, "#00ff88")}
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3" /></svg>
+                    Test via API
+                  </button>
+                  <button
+                    onClick={() => setMcpModal("claude")}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={BTN(true, "#f97316")}
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 9h8M8 13h5" /></svg>
+                    Test via Claude Code
+                  </button>
+                  <button
+                    onClick={() => setMcpModal("opencode")}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium"
+                    style={BTN(true, "#a855f7")}
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" /></svg>
+                    Test via Opencode
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1581,59 +1661,6 @@ export default function TestsPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#4a5568" }}>
-                  Run Scope
-                </span>
-                <div className="grid sm:grid-cols-3 gap-2">
-                  <button onClick={() => setRunMode("all")} className="px-3 py-1.5 rounded text-xs" style={BTN(runMode === "all", "#00ff88")}>All enabled cases</button>
-                  <button onClick={() => setRunMode("workflows")} className="px-3 py-1.5 rounded text-xs" style={BTN(runMode === "workflows", "#a855f7")}>Selected workflows</button>
-                  <button onClick={() => setRunMode("cases")} className="px-3 py-1.5 rounded text-xs" style={BTN(runMode === "cases", "#00d4ff")}>Selected cases</button>
-                </div>
-
-                {runMode === "workflows" && config && (
-                  <div className="flex flex-wrap gap-2">
-                    {config.workflows.map((wf) => (
-                      <button
-                        key={wf.id}
-                        onClick={() =>
-                          setSelectedWorkflowIds((prev) =>
-                            prev.includes(wf.id) ? prev.filter((v) => v !== wf.id) : [...prev, wf.id]
-                          )
-                        }
-                        className="px-2 py-1 rounded text-xs font-mono"
-                        style={BTN(selectedWorkflowIds.includes(wf.id), "#a855f7")}
-                      >
-                        {wf.id}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {runMode === "cases" && config && (
-                  <div className="flex flex-wrap gap-2">
-                    {config.test_cases.map((tc) => (
-                      <button
-                        key={tc.id}
-                        onClick={() =>
-                          setSelectedCaseIds((prev) =>
-                            prev.includes(tc.id) ? prev.filter((v) => v !== tc.id) : [...prev, tc.id]
-                          )
-                        }
-                        className="px-2 py-1 rounded text-xs font-mono"
-                        style={BTN(selectedCaseIds.includes(tc.id), "#00d4ff")}
-                      >
-                        {tc.id}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <p className="text-xs" style={{ color: "#4a5568" }}>
-                  Effective run order: {resolvedRunCaseIds.length > 0 ? resolvedRunCaseIds.join(" → ") : "None selected"}
-                </p>
-              </div>
-
               {/* ── Test Cases ── */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
@@ -1676,38 +1703,6 @@ export default function TestsPage() {
                       Add Case
                     </button>
 
-                    <button
-                      onClick={() => setMcpModal("api")}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium"
-                      style={BTN(true, "#00ff88")}
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                      Test via API
-                    </button>
-
-                    <button
-                      onClick={() => setMcpModal("claude")}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium"
-                      style={BTN(true, "#f97316")}
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M8 9h8M8 13h5" />
-                      </svg>
-                      Test via Claude Code
-                    </button>
-
-                    <button
-                      onClick={() => setMcpModal("opencode")}
-                      className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium"
-                      style={BTN(true, "#a855f7")}
-                    >
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" />
-                      </svg>
-                      Test via Opencode
-                    </button>
                   </div>
                 </div>
 
