@@ -14,6 +14,7 @@ function McpModal({
   runMode,
   selectedWorkflowIds,
   selectedCaseIds,
+  onBackgroundStarted,
   onClose,
 }: {
   target: McpTarget;
@@ -21,12 +22,12 @@ function McpModal({
   runMode: RunSelectionMode;
   selectedWorkflowIds: string[];
   selectedCaseIds: string[];
+  onBackgroundStarted: (input: { target: McpTarget; runId: string; project: string }) => void;
   onClose: () => void;
 }) {
   const [regressionDir, setRegressionDir] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
-  const [autoOutput, setAutoOutput] = useState("");
   const [autoError, setAutoError] = useState("");
 
   useEffect(() => {
@@ -133,7 +134,6 @@ function McpModal({
     }
     setAutoRunning(true);
     setAutoError("");
-    setAutoOutput("");
     try {
       const res = isApi
         ? await fetch(`/api/tests/run?project=${encodeURIComponent(project)}`, {
@@ -158,38 +158,9 @@ function McpModal({
       if (!res.ok) {
         setAutoError(data.error ?? "Failed to start auto run");
       } else {
-        if (isApi) {
-          const runId = String(data.run_id ?? "");
-          setAutoOutput(`Run started: ${runId || "unknown"}. Waiting for completion...`);
-
-          let done = false;
-          for (let i = 0; i < 120; i += 1) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            const statusRes = await fetch(`/api/tests/run?project=${encodeURIComponent(project)}`);
-            if (!statusRes.ok) continue;
-            const status = await statusRes.json();
-            if (!status.running) {
-              done = true;
-              break;
-            }
-          }
-
-          if (!done) {
-            setAutoError("Run is still in progress. Refresh recent runs in the main page.");
-          } else {
-            const resultsRes = await fetch(`/api/tests/results?project=${encodeURIComponent(project)}&limit=1`);
-            if (!resultsRes.ok) {
-              setAutoError("Run completed but failed to load latest result.");
-            } else {
-              const latest = await resultsRes.json();
-              const run = latest.results?.[0];
-              setAutoOutput(run ? JSON.stringify(run, null, 2) : "Run completed with no result payload.");
-            }
-          }
-        } else {
-          setAutoOutput(data.output ?? "");
-          if (!data.success) setAutoError(`Command failed (exit ${data.exitCode})`);
-        }
+        const runId = String(data.run_id ?? "");
+        onBackgroundStarted({ target, runId, project });
+        onClose();
       }
     } catch {
       setAutoError("Network error while running agent");
@@ -299,20 +270,12 @@ function McpModal({
             className="px-3 py-1.5 rounded text-xs font-medium"
             style={BTN(!autoRunning, accent)}
           >
-            {autoRunning ? "Auto-running…" : "Auto Run Now"}
+            {autoRunning ? "Starting…" : "Auto Run (Background)"}
           </button>
           {autoError && (
             <div className="text-xs px-2 py-1 rounded" style={{ background: "rgba(255,68,68,0.1)", color: "#ff4444", border: "1px solid rgba(255,68,68,0.2)" }}>
               {autoError}
             </div>
-          )}
-          {autoOutput && (
-            <pre
-              className="p-3 rounded-lg text-xs overflow-x-auto"
-              style={{ background: "rgba(0,0,0,0.4)", color: "#e2e8f0", border: "1px solid #1e2d4a", fontFamily: "monospace", whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 240, overflowY: "auto" }}
-            >
-              {autoOutput}
-            </pre>
           )}
         </div>
 
@@ -379,6 +342,18 @@ interface RunResult {
   failed: number;
   skipped: number;
   results: CaseResult[];
+}
+
+interface AgentRun {
+  run_id: string;
+  project: string;
+  target: "claude" | "opencode";
+  status: "running" | "completed" | "failed";
+  started_at: string;
+  completed_at?: string;
+  workflow_ids: string[];
+  case_ids: string[];
+  exit_code?: number;
 }
 
 /** Extract all {{VAR}} placeholders from a list of test cases */
@@ -936,6 +911,7 @@ export default function TestsPage() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [config, setConfig] = useState<TestConfig | null>(null);
   const [results, setResults] = useState<RunResult[]>([]);
+  const [agentRuns, setAgentRuns] = useState<AgentRun[]>([]);
   const [saving, setSaving] = useState(false);
   const [running, setRunning] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -987,6 +963,14 @@ export default function TestsPage() {
     }
   }, []);
 
+  const loadAgentRuns = useCallback(async (slug: string) => {
+    const res = await fetch(`/api/tests/agent-run?project=${encodeURIComponent(slug)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setAgentRuns(data.runs ?? []);
+    }
+  }, []);
+
   // Load env vars for selected project
   const loadEnvVars = useCallback(async (slug: string) => {
     const res = await fetch(`/api/tests/env?project=${encodeURIComponent(slug)}`);
@@ -1026,6 +1010,7 @@ export default function TestsPage() {
     if (!selectedProject) return;
     loadConfig(selectedProject);
     loadResults(selectedProject);
+    loadAgentRuns(selectedProject);
     loadEnvVars(selectedProject);
     setEditingCase(null);
     setEditingWorkflow(null);
@@ -1042,7 +1027,15 @@ export default function TestsPage() {
         }
       })
       .catch(() => {});
-  }, [selectedProject, loadConfig, loadResults, loadEnvVars, pollRunStatus]);
+
+    const agentPoll = setInterval(() => {
+      loadAgentRuns(selectedProject);
+    }, 5000);
+
+    return () => {
+      clearInterval(agentPoll);
+    };
+  }, [selectedProject, loadConfig, loadResults, loadAgentRuns, loadEnvVars, pollRunStatus]);
 
   // Save config to server
   const saveConfig = useCallback(async (updated: TestConfig) => {
@@ -1151,6 +1144,12 @@ export default function TestsPage() {
     saveConfig(updated);
   };
 
+  const openWorkflowRun = (target: McpTarget, workflowId: string) => {
+    setRunMode("workflows");
+    setSelectedWorkflowIds([workflowId]);
+    setMcpModal(target);
+  };
+
   const handleCreateProject = async () => {
     const slug = slugify(newProjectSlug);
     if (!slug) return;
@@ -1173,6 +1172,20 @@ export default function TestsPage() {
 
   const allCaseIds = config?.test_cases.map((c) => c.id) ?? [];
   const resolvedRunCaseIds = resolveRunCaseIds(config, runMode, selectedWorkflowIds, selectedCaseIds);
+  const runningAgentRuns = agentRuns.filter((run) => run.status === "running");
+
+  const handleBackgroundStarted = useCallback(
+    ({ target, project }: { target: McpTarget; runId: string; project: string }) => {
+      if (project !== selectedProject) return;
+      if (target === "api") {
+        setRunning(true);
+        if (pollRef.current) clearInterval(pollRef.current);
+        pollRef.current = setInterval(() => pollRunStatus(project), 5000);
+      }
+      loadAgentRuns(project);
+    },
+    [selectedProject, pollRunStatus, loadAgentRuns]
+  );
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-6">
@@ -1205,6 +1218,46 @@ export default function TestsPage() {
           ← Dashboard
         </a>
       </div>
+
+      {(running || runningAgentRuns.length > 0) && (
+        <div className="fixed top-4 right-4 z-40 w-full max-w-sm">
+          <div
+            className="rounded-lg p-3 space-y-2"
+            style={{
+              background: "rgba(10,14,26,0.95)",
+              border: "1px solid rgba(0,212,255,0.25)",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>
+              Running
+            </div>
+
+            {running && selectedProject && (
+              <div className="flex items-center gap-2 text-xs" style={{ color: "#00ff88" }}>
+                <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 12a9 9 0 1 1-9-9" />
+                </svg>
+                <span className="font-mono">API · {selectedProject}</span>
+              </div>
+            )}
+
+            {runningAgentRuns.map((run) => (
+              <div key={run.run_id} className="rounded px-2 py-1.5" style={{ background: "rgba(30,45,74,0.45)", border: "1px solid rgba(30,45,74,0.7)" }}>
+                <div className="flex items-center gap-2 text-xs" style={{ color: run.target === "claude" ? "#f97316" : "#a855f7" }}>
+                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-9-9" />
+                  </svg>
+                  <span className="font-mono">{run.target} · {run.project}</span>
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                  started {formatTime(run.started_at)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* LEFT: Project selector */}
@@ -1350,9 +1403,37 @@ export default function TestsPage() {
                             </div>
                             {wf.description && <p className="text-xs mt-0.5" style={{ color: "#4a5568" }}>{wf.description}</p>}
                           </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button onClick={() => setEditingWorkflow(wf)} className="w-6 h-6 rounded" style={BTN(true, "#a855f7")}>Edit</button>
-                            <button onClick={() => { if (confirm(`Delete workflow \"${wf.label}\"?`)) handleDeleteWorkflow(wf.id); }} className="w-6 h-6 rounded" style={BTN(true, "#ff4444")}>×</button>
+                          <div className="flex items-center gap-1 flex-wrap justify-end flex-shrink-0">
+                            <button
+                              onClick={() => openWorkflowRun("api", wf.id)}
+                              className="px-2 py-1 rounded text-[11px] whitespace-nowrap"
+                              style={BTN(true, "#00ff88")}
+                            >
+                              Test via API
+                            </button>
+                            <button
+                              onClick={() => openWorkflowRun("claude", wf.id)}
+                              className="px-2 py-1 rounded text-[11px] whitespace-nowrap"
+                              style={BTN(true, "#f97316")}
+                            >
+                              Test via Claude Code
+                            </button>
+                            <button
+                              onClick={() => setEditingWorkflow(wf)}
+                              className="px-2 py-1 rounded text-xs"
+                              style={BTN(true, "#a855f7")}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Delete workflow \"${wf.label}\"?`)) handleDeleteWorkflow(wf.id);
+                              }}
+                              className="w-6 h-6 rounded"
+                              style={BTN(true, "#ff4444")}
+                            >
+                              ×
+                            </button>
                           </div>
                         </div>
                       )
@@ -1721,6 +1802,7 @@ export default function TestsPage() {
           runMode={runMode}
           selectedWorkflowIds={selectedWorkflowIds}
           selectedCaseIds={resolvedRunCaseIds}
+          onBackgroundStarted={handleBackgroundStarted}
           onClose={() => setMcpModal(null)}
         />
       )}
