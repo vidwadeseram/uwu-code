@@ -253,6 +253,20 @@ UVXSCRIPT
   chmod 755 /usr/local/bin/uvx
 fi
 
+# uwu-mcp: fast wrapper for the MCP server (bypasses uv run startup overhead)
+# Claude Code uses this wrapper; it must run from the regression_tests dir so
+# pydantic_settings finds the .env there (not from /root which uwu can't access).
+cat > /usr/local/bin/uwu-mcp << UWUMCPSCRIPT
+#!/bin/bash
+cd $INSTALL_DIR/regression_tests
+exec $INSTALL_DIR/regression_tests/.venv/bin/python mcp_server.py
+UWUMCPSCRIPT
+chmod 755 /usr/local/bin/uwu-mcp
+
+# Register the MCP server in uwu's claude config (project: /home/uwu)
+# so 'cd /home/uwu && claude ...' can find it without extra setup.
+sudo -u uwu bash -c 'cd /home/uwu && claude mcp remove uwu-tester 2>/dev/null; claude mcp add uwu-tester -- /usr/local/bin/uwu-mcp' || true
+
 ###############################################################################
 # Clone / update repo
 ###############################################################################

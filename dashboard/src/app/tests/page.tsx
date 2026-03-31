@@ -34,21 +34,6 @@ function McpModal({
 
   const dir = regressionDir ?? "/opt/vps-dashboard/regression_tests";
 
-  const mcpJsonContent = JSON.stringify(
-    {
-      mcpServers: {
-        "uwu-tester": {
-          type: "stdio",
-          command: "/usr/local/bin/uv",
-          args: ["run", "mcp_server.py"],
-          cwd: dir,
-        },
-      },
-    },
-    null,
-    2
-  );
-
   const opencodeMcpContent = JSON.stringify(
     {
       mcp: {
@@ -62,13 +47,13 @@ function McpModal({
     2
   );
 
-  // Shell command that writes the config file — user runs this once, then done
-  const claudeWriteConfig = `sudo tee /home/uwu/.mcp.json << 'MCPEOF'\n${mcpJsonContent}\nMCPEOF`;
+  // Step 2: one-time setup — register MCP server in uwu's claude config
+  const claudeWriteConfig = `sudo -u uwu bash -c 'cd /home/uwu && claude mcp add uwu-tester -- /usr/local/bin/uwu-mcp'`;
   const opencodeWriteConfig = `sudo mkdir -p /home/uwu/.config/opencode\nsudo tee /home/uwu/.config/opencode/config.json << 'MCPEOF'\n${opencodeMcpContent}\nMCPEOF`;
 
   const prompt = `Use the uwu-tester MCP server to run tests for the '${project}' project, then give me a detailed pass/fail report for each test case.`;
 
-  // Claude reads .mcp.json from cwd automatically — no --mcp-config flag needed.
+  // Must cd /home/uwu so Claude uses the project scope where the MCP server is registered.
   // Run as uwu (non-root) so --dangerously-skip-permissions is accepted.
   const claudeCmd = `sudo -u uwu bash -c 'cd /home/uwu && claude --dangerously-skip-permissions -p "${prompt}"'`;
   const opencodeCmd = `sudo -u uwu bash -c 'cd /home/uwu && opencode "${prompt}"'`;
@@ -87,7 +72,7 @@ function McpModal({
   );
 
   const configBlock = isClaudeCode ? claudeWriteConfig : opencodeWriteConfig;
-  const configKey = isClaudeCode ? "Run once to create /home/uwu/.mcp.json" : "Run once to create opencode config";
+  const configKey = isClaudeCode ? "Run once to register the MCP server" : "Run once to create opencode config";
   const cmdKey = isClaudeCode ? "Run in terminal (as root)" : "Run in terminal (as root)";
   const cmd = isClaudeCode ? claudeCmd : opencodeCmd;
 
