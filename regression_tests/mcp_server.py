@@ -25,11 +25,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+BASE_DIR = Path(__file__).parent
+# pydantic_settings (used by FastMCP) auto-reads .env from cwd.
+# Change to our own dir so it finds the right .env (not /root/.env which uwu can't access).
+os.chdir(BASE_DIR)
+
 from fastmcp import FastMCP
 
 mcp = FastMCP("uwu-tester")
-
-BASE_DIR = Path(__file__).parent
 TEST_CASES_DIR = BASE_DIR / "test_cases"
 RESULTS_DIR = BASE_DIR / "results"
 
