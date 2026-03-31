@@ -20,6 +20,7 @@ import asyncio
 import argparse
 import json
 import os
+import re
 import sys
 import time
 from dataclasses import asdict, dataclass, field
@@ -29,12 +30,57 @@ from pathlib import Path
 from browser_use import Agent
 from browser_use.browser.profile import BrowserProfile
 from browser_use.llm.openrouter.chat import ChatOpenRouter
+from pydantic import BaseModel
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
 BASE_DIR = Path(__file__).parent
 TEST_CASES_DIR = BASE_DIR / "test_cases"
 RESULTS_DIR = BASE_DIR / "results"
+
+
+_JSON_RECOVERY_PATCHED = False
+
+
+def _strip_json_fences(value: str) -> str:
+    text = value.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+        text = re.sub(r"\s*```$", "", text)
+    return text.strip()
+
+
+def _extract_json_object(value: str) -> str:
+    text = _strip_json_fences(value)
+    first = text.find("{")
+    last = text.rfind("}")
+    if first != -1 and last != -1 and last > first:
+        return text[first:last + 1]
+    return text
+
+
+def install_json_recovery_patch() -> None:
+    global _JSON_RECOVERY_PATCHED
+    if _JSON_RECOVERY_PATCHED:
+        return
+
+    original = BaseModel.model_validate_json
+
+    @classmethod
+    def patched(cls, json_data, *args, **kwargs):
+        try:
+            return original.__func__(cls, json_data, *args, **kwargs)
+        except Exception:
+            if isinstance(json_data, bytes):
+                cleaned = _extract_json_object(json_data.decode("utf-8", errors="ignore"))
+                return original.__func__(cls, cleaned.encode("utf-8"), *args, **kwargs)
+            if isinstance(json_data, str):
+                cleaned = _extract_json_object(json_data)
+                return original.__func__(cls, cleaned, *args, **kwargs)
+            raise
+
+    BaseModel.model_validate_json = patched
+    _JSON_RECOVERY_PATCHED = True
 
 
 @dataclass
@@ -57,6 +103,7 @@ def substitute_vars(text: str, env: dict[str, str]) -> str:
 async def run_case(
     case: dict,
     llm,
+    fallback_llm,
     env: dict[str, str],
     recording_dir: Path | None = None,
 ) -> CaseResult:
@@ -79,7 +126,7 @@ async def run_case(
         args=["--no-sandbox", "--disable-dev-shm-usage"],
         save_recording_path=str(case_rec_dir) if case_rec_dir else None,
     )
-    agent = Agent(task=task, llm=llm, browser_profile=profile)
+    agent = Agent(task=task, llm=llm, fallback_llm=fallback_llm, browser_profile=profile)
     passed = False
     detail = "No result returned"
     exc_info: str | None = None
@@ -222,6 +269,7 @@ async def main() -> None:
     openai_key     = env.get("OPENAI_API_KEY", "")
 
     llm = None
+    fallback_llm = None
     llm_label = ""
 
     # Read model preference from settings.json (set via /settings UI)
@@ -249,7 +297,11 @@ async def main() -> None:
 
             OpenRouterMessageSerializer.serialize_messages = staticmethod(patched_serialize)
             print(f"INFO: Enabled Gemma compatibility mode for {model} (system -> user role remap)")
+            install_json_recovery_patch()
         llm = ChatOpenRouter(model=model, api_key=openrouter_key, timeout=180)
+        alt_model = env.get("OPENROUTER_ALT_MODEL", "google/gemma-3-4b-it:free")
+        if alt_model and alt_model != model:
+            fallback_llm = ChatOpenRouter(model=alt_model, api_key=openrouter_key, timeout=180)
         llm_label = f"OpenRouter / {model}"
     elif anthropic_key:
         llm = ChatAnthropic(model="claude-3-5-haiku-20241022", api_key=anthropic_key, timeout=120, max_tokens=8096)
@@ -290,7 +342,7 @@ async def main() -> None:
             skipped_ids.add(case["id"])
             continue
 
-        result = await run_case(case, llm, env, recording_dir)
+        result = await run_case(case, llm, fallback_llm, env, recording_dir)
         results.append(result)
 
         if not result.passed and case.get("skip_dependents_on_fail", False):
