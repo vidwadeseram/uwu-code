@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -346,6 +346,240 @@ function CredentialsSection({ authState, onAuthChange }: { authState: AuthState;
   );
 }
 
+// ── Model Selector ────────────────────────────────────────────────────────────
+
+interface ORModel {
+  id: string;
+  name: string;
+  context_length: number;
+  free: boolean;
+  prompt_price_per_m: number;
+}
+
+function ModelPicker({
+  label,
+  value,
+  onChange,
+  models,
+  loading,
+}: {
+  label: string;
+  value: string;
+  onChange: (id: string) => void;
+  models: ORModel[];
+  loading: boolean;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const selected = models.find((m) => m.id === value);
+  const filtered = models.filter(
+    (m) =>
+      m.id.toLowerCase().includes(search.toLowerCase()) ||
+      m.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>{label}</label>
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs text-left"
+          style={{ ...INPUT, fontFamily: "monospace" }}
+          disabled={loading}
+        >
+          <span className="flex items-center gap-2 min-w-0">
+            {selected ? (
+              <>
+                <span className="truncate" style={{ color: "#e2e8f0" }}>{selected.name}</span>
+                {selected.free ? (
+                  <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-bold" style={{ background: "rgba(0,255,136,0.15)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.3)" }}>FREE</span>
+                ) : (
+                  <span className="flex-shrink-0 text-xs" style={{ color: "#4a5568" }}>${selected.prompt_price_per_m}/M</span>
+                )}
+              </>
+            ) : (
+              <span style={{ color: "#4a5568" }}>{loading ? "Loading models…" : value || "Select model…"}</span>
+            )}
+          </span>
+          <svg className="w-3 h-3 flex-shrink-0 ml-2" style={{ color: "#4a5568" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {open && (
+          <div
+            className="absolute z-50 left-0 right-0 mt-1 rounded-lg overflow-hidden"
+            style={{ background: "#0f1629", border: "1px solid #1e2d4a", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", maxHeight: "320px", display: "flex", flexDirection: "column" }}
+          >
+            <div className="p-2 border-b" style={{ borderColor: "#1e2d4a" }}>
+              <input
+                autoFocus
+                type="text"
+                placeholder="Search models…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full px-2 py-1.5 rounded text-xs outline-none"
+                style={{ background: "rgba(30,45,74,0.6)", color: "#e2e8f0", border: "1px solid #1e2d4a" }}
+              />
+            </div>
+            <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
+              {filtered.length === 0 ? (
+                <div className="px-3 py-4 text-xs text-center" style={{ color: "#4a5568" }}>No models found</div>
+              ) : (
+                filtered.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => { onChange(m.id); setOpen(false); setSearch(""); }}
+                    className="w-full flex items-center justify-between px-3 py-2.5 text-left transition-colors"
+                    style={{
+                      background: m.id === value ? "rgba(0,212,255,0.08)" : "transparent",
+                      borderLeft: m.id === value ? "2px solid #00d4ff" : "2px solid transparent",
+                    }}
+                    onMouseEnter={(e) => { if (m.id !== value) e.currentTarget.style.background = "rgba(30,45,74,0.5)"; }}
+                    onMouseLeave={(e) => { if (m.id !== value) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-xs font-medium truncate" style={{ color: "#e2e8f0" }}>{m.name}</span>
+                      <span className="text-xs font-mono truncate" style={{ color: "#4a5568" }}>{m.id}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                      {m.free ? (
+                        <span className="px-1.5 py-0.5 rounded text-xs font-bold" style={{ background: "rgba(0,255,136,0.15)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.3)" }}>FREE</span>
+                      ) : (
+                        <span className="text-xs" style={{ color: "#4a5568" }}>${m.prompt_price_per_m}/M</span>
+                      )}
+                      {m.context_length > 0 && (
+                        <span className="text-xs" style={{ color: "#2e4a7a" }}>{m.context_length >= 1000 ? `${Math.round(m.context_length / 1000)}k` : m.context_length}</span>
+                      )}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+      {selected && (
+        <div className="text-xs font-mono" style={{ color: "#2e4a7a" }}>{selected.id}</div>
+      )}
+    </div>
+  );
+}
+
+function ModelsSection() {
+  const [models, setModels] = useState<ORModel[]>([]);
+  const [testsModel, setTestsModel] = useState("anthropic/claude-3-5-haiku");
+  const [openclawModel, setOpenclawModel] = useState("anthropic/claude-opus-4");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/api/settings/models")
+      .then((r) => r.json())
+      .then((d) => {
+        setModels(d.models ?? []);
+        if (d.selected?.tests) setTestsModel(d.selected.tests);
+        if (d.selected?.openclaw) setOpenclawModel(d.selected.openclaw);
+        if (d.error) setError(d.error);
+      })
+      .catch(() => setError("Failed to load models"))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save() {
+    setSaving(true); setError(""); setSaved(false);
+    try {
+      const res = await fetch("/api/settings/models", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tests: testsModel, openclaw: openclawModel }),
+      });
+      if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000); }
+      else { const d = await res.json(); setError(d.error ?? "Save failed"); }
+    } catch { setError("Connection error"); }
+    finally { setSaving(false); }
+  }
+
+  const freeCount = models.filter((m) => m.free).length;
+
+  return (
+    <Section
+      title="Model Selection"
+      icon={
+        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 2a10 10 0 1 0 10 10" /><path d="M12 6v6l4 2" />
+        </svg>
+      }
+    >
+      <p className="text-xs" style={{ color: "#4a5568" }}>
+        Choose which OpenRouter model each feature uses.
+        {!loading && models.length > 0 && (
+          <span> Showing <strong style={{ color: "#00ff88" }}>{freeCount} free</strong> and <strong style={{ color: "#94a3b8" }}>{models.length - freeCount} paid</strong> models.</span>
+        )}
+      </p>
+
+      {error && (
+        <div className="text-xs px-3 py-2 rounded" style={{ background: "rgba(255,215,0,0.08)", color: "#ffd700", border: "1px solid rgba(255,215,0,0.2)" }}>
+          {error}
+        </div>
+      )}
+
+      <div className="flex flex-col gap-4">
+        <ModelPicker
+          label="Tests (browser-use agent)"
+          value={testsModel}
+          onChange={setTestsModel}
+          models={models}
+          loading={loading}
+        />
+        <ModelPicker
+          label="OpenClaw (research & chat)"
+          value={openclawModel}
+          onChange={setOpenclawModel}
+          models={models}
+          loading={loading}
+        />
+      </div>
+
+      {saved && (
+        <div className="text-xs px-3 py-2 rounded" style={{ background: "rgba(0,255,136,0.08)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.2)" }}>
+          ✓ Models saved
+        </div>
+      )}
+
+      <button
+        onClick={save}
+        disabled={saving || loading}
+        className="self-start px-4 py-2 rounded text-sm font-semibold transition-opacity"
+        style={{
+          background: "rgba(0,212,255,0.12)",
+          color: "#00d4ff",
+          border: "1px solid rgba(0,212,255,0.3)",
+          cursor: saving || loading ? "not-allowed" : "pointer",
+          opacity: saving || loading ? 0.6 : 1,
+        }}
+      >
+        {saving ? "Saving…" : "Save Models"}
+      </button>
+    </Section>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -395,7 +629,7 @@ export default function SettingsPage() {
           </div>
           <div>
             <h1 className="text-lg font-bold" style={{ color: "#00d4ff" }}>Settings</h1>
-            <p className="text-xs" style={{ color: "#4a5568" }}>API keys · Login credentials</p>
+            <p className="text-xs" style={{ color: "#4a5568" }}>API keys · Models · Login credentials</p>
           </div>
         </div>
         {authState.authEnabled && (
@@ -410,6 +644,7 @@ export default function SettingsPage() {
       </div>
 
       <ApiKeysSection authed={authState.ok} />
+      <ModelsSection />
       <CredentialsSection authState={authState} onAuthChange={checkAuth} />
     </div>
   );

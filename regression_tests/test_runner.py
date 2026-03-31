@@ -160,8 +160,17 @@ async def main() -> None:
     llm = None
     llm_label = ""
 
+    # Read model preference from settings.json (set via /settings UI)
+    settings_file = BASE_DIR.parent / "settings.json"
+    saved_tests_model: str | None = None
+    try:
+        import json as _json
+        saved_tests_model = _json.loads(settings_file.read_text()).get("models", {}).get("tests")
+    except Exception:
+        pass
+
     if openrouter_key:
-        model = env.get("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+        model = saved_tests_model or env.get("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
         llm = ChatOpenRouter(model=model, api_key=openrouter_key, timeout=120)
         llm_label = f"OpenRouter / {model}"
     elif anthropic_key:

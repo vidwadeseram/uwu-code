@@ -10,6 +10,10 @@ export interface Settings {
   username: string;
   password_hash: string;
   session_token: string;
+  models?: {
+    tests?: string;
+    openclaw?: string;
+  };
 }
 
 export function readSettings(): Settings {

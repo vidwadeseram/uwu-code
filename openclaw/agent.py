@@ -20,6 +20,7 @@ DATA_DIR = AGENT_DIR / "data"
 TASKS_FILE = DATA_DIR / "tasks.json"
 STATUS_FILE = DATA_DIR / "status.json"
 LOG_FILE = DATA_DIR / "agent.log"
+SETTINGS_FILE = AGENT_DIR.parent / "settings.json"
 ENV_FILE = AGENT_DIR.parent / "regression_tests" / ".env"
 POLL_INTERVAL = 10  # seconds
 
@@ -198,6 +199,13 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
     openai_key     = os.environ.get("OPENAI_API_KEY", "").strip()
     openrouter_key = os.environ.get("OPENROUTER_API_KEY", "").strip()
 
+    # Read model preference from settings.json (set via /settings UI)
+    or_model = "anthropic/claude-opus-4"
+    try:
+        or_model = json.loads(SETTINGS_FILE.read_text()).get("models", {}).get("openclaw") or or_model
+    except Exception:
+        pass
+
     # ── 1. OpenRouter (preferred — most flexible, access to many models) ──────
     if openrouter_key:
         try:
@@ -207,7 +215,7 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
                 base_url="https://openrouter.ai/api/v1",
             )
             resp = client.chat.completions.create(
-                model="anthropic/claude-opus-4",
+                model=or_model,
                 messages=[{"role": "user", "content": desc}],
             )
             return True, resp.choices[0].message.content or ""
