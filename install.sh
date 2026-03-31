@@ -244,6 +244,15 @@ UVUWUSCRIPT
   chmod 755 /usr/local/bin/uv-uwu
 fi
 
+# uvx = uv tool run; newer browser-use calls uvx directly
+if [ ! -f /usr/local/bin/uvx ]; then
+  cat > /usr/local/bin/uvx << 'UVXSCRIPT'
+#!/bin/bash
+exec /usr/local/bin/uv tool run "$@"
+UVXSCRIPT
+  chmod 755 /usr/local/bin/uvx
+fi
+
 ###############################################################################
 # Clone / update repo
 ###############################################################################
