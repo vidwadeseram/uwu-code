@@ -390,38 +390,55 @@ function resolveRunCaseIds(
 ): string[] {
   if (!config) return [];
   const caseById = new Map(config.test_cases.map((tc) => [tc.id, tc]));
-  const requested = new Set<string>();
+  const workflowById = new Map(config.workflows.map((wf) => [wf.id, wf]));
+  const requestedOrder: string[] = [];
+  const requestedSet = new Set<string>();
+
+  const pushRequested = (caseId: string) => {
+    if (!caseId || requestedSet.has(caseId)) return;
+    requestedSet.add(caseId);
+    requestedOrder.push(caseId);
+  };
 
   if (mode === "workflows") {
-    const workflowSet = new Set(selectedWorkflowIds);
-    for (const wf of config.workflows) {
-      if (!workflowSet.has(wf.id)) continue;
-      for (const caseId of wf.case_ids) requested.add(caseId);
-    }
+    selectedWorkflowIds.forEach((workflowId) => {
+      const wf = workflowById.get(workflowId);
+      if (wf) {
+        wf.case_ids.forEach((caseId) => {
+          pushRequested(caseId);
+        });
+      }
+    });
   } else if (mode === "cases") {
-    for (const caseId of selectedCaseIds) requested.add(caseId);
+    selectedCaseIds.forEach((caseId) => {
+      pushRequested(caseId);
+    });
   } else {
-    for (const tc of config.test_cases) {
-      if (tc.enabled) requested.add(tc.id);
-    }
+    config.test_cases.forEach((tc) => {
+      if (tc.enabled) pushRequested(tc.id);
+    });
   }
 
-  const resolved = new Set<string>();
+  const resolvedSet = new Set<string>();
+  const orderedResolved: string[] = [];
   const walk = (caseId: string, seen: Set<string>) => {
-    if (resolved.has(caseId) || seen.has(caseId)) return;
+    if (resolvedSet.has(caseId) || seen.has(caseId)) return;
     const tc = caseById.get(caseId);
     if (!tc) return;
     seen.add(caseId);
     if (tc.depends_on) walk(tc.depends_on, seen);
-    resolved.add(caseId);
+    seen.delete(caseId);
+    if (!resolvedSet.has(caseId)) {
+      resolvedSet.add(caseId);
+      orderedResolved.push(caseId);
+    }
   };
 
-  requested.forEach((caseId) => {
+  requestedOrder.forEach((caseId) => {
     walk(caseId, new Set());
   });
-  return config.test_cases
-    .map((tc) => tc.id)
-    .filter((caseId) => resolved.has(caseId));
+
+  return orderedResolved;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -645,11 +662,25 @@ function WorkflowEditor({
   const [error, setError] = useState("");
   const isNew = !initial.id;
 
-  const toggleCase = (caseId: string) => {
-    setCaseIds((prev) =>
-      prev.includes(caseId) ? prev.filter((v) => v !== caseId) : [...prev, caseId]
-    );
+  const addCase = (caseId: string) => {
+    setCaseIds((prev) => (prev.includes(caseId) ? prev : [...prev, caseId]));
   };
+
+  const removeCase = (caseId: string) => {
+    setCaseIds((prev) => prev.filter((v) => v !== caseId));
+  };
+
+  const moveCase = (index: number, direction: -1 | 1) => {
+    setCaseIds((prev) => {
+      const next = [...prev];
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= next.length) return prev;
+      [next[index], next[newIndex]] = [next[newIndex], next[index]];
+      return next;
+    });
+  };
+
+  const availableCases = cases.filter((tc) => !caseIds.includes(tc.id));
 
   const handleSave = () => {
     if (!id.trim()) {
@@ -715,17 +746,50 @@ function WorkflowEditor({
         placeholder="Optional workflow description"
       />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 rounded" style={{ background: "rgba(10,14,26,0.6)", border: "1px solid rgba(30,45,74,0.5)" }}>
-        {cases.map((tc) => (
-          <label key={tc.id} className="flex items-center gap-2 text-xs" style={{ color: "#94a3b8" }}>
-            <input
-              type="checkbox"
-              checked={caseIds.includes(tc.id)}
-              onChange={() => toggleCase(tc.id)}
-            />
-            <span className="font-mono">{tc.id}</span>
-          </label>
-        ))}
+      <div className="space-y-2">
+        <div className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#4a5568" }}>
+          Workflow order
+        </div>
+        <div className="space-y-1 max-h-40 overflow-y-auto p-2 rounded" style={{ background: "rgba(10,14,26,0.6)", border: "1px solid rgba(30,45,74,0.5)" }}>
+          {caseIds.length === 0 ? (
+            <div className="text-xs" style={{ color: "#4a5568" }}>No cases selected.</div>
+          ) : (
+            caseIds.map((caseId, index) => {
+              const tc = cases.find((item) => item.id === caseId);
+              return (
+                <div key={`${caseId}-${index}`} className="flex items-center gap-2 rounded px-2 py-1" style={{ background: "rgba(30,45,74,0.35)", border: "1px solid rgba(30,45,74,0.6)" }}>
+                  <span className="text-[11px] w-4 text-right" style={{ color: "#4a5568" }}>{index + 1}</span>
+                  <span className="font-mono text-xs flex-1" style={{ color: "#94a3b8" }}>{caseId}</span>
+                  {tc && <span className="text-[11px] hidden sm:inline" style={{ color: "#4a5568" }}>{tc.label}</span>}
+                  <button onClick={() => moveCase(index, -1)} disabled={index === 0} className="w-5 h-5 rounded text-[10px]" style={BTN(index !== 0, "#94a3b8")}>↑</button>
+                  <button onClick={() => moveCase(index, 1)} disabled={index === caseIds.length - 1} className="w-5 h-5 rounded text-[10px]" style={BTN(index !== caseIds.length - 1, "#94a3b8")}>↓</button>
+                  <button onClick={() => removeCase(caseId)} className="w-5 h-5 rounded text-[10px]" style={BTN(true, "#ff4444")}>×</button>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="text-[11px] font-semibold uppercase tracking-widest" style={{ color: "#4a5568" }}>
+          Add cases
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 rounded" style={{ background: "rgba(10,14,26,0.6)", border: "1px solid rgba(30,45,74,0.5)" }}>
+          {availableCases.length === 0 ? (
+            <div className="text-xs" style={{ color: "#4a5568" }}>All cases already included.</div>
+          ) : (
+            availableCases.map((tc) => (
+              <button
+                key={tc.id}
+                onClick={() => addCase(tc.id)}
+                className="flex items-center justify-between gap-2 text-xs px-2 py-1 rounded text-left"
+                style={BTN(true, "#00d4ff")}
+              >
+                <span className="font-mono">{tc.id}</span>
+                <span className="text-[10px]">＋</span>
+              </button>
+            ))
+          )}
+        </div>
       </div>
 
       <label className="flex items-center gap-2 text-xs" style={{ color: "#94a3b8" }}>
@@ -1402,6 +1466,9 @@ export default function TestsPage() {
                               <span className="text-xs" style={{ color: "#4a5568" }}>{wf.case_ids.length} cases</span>
                             </div>
                             {wf.description && <p className="text-xs mt-0.5" style={{ color: "#4a5568" }}>{wf.description}</p>}
+                            <p className="text-[11px] mt-1 font-mono break-words" style={{ color: "#64748b" }}>
+                              {wf.case_ids.join(" → ")}
+                            </p>
                           </div>
                           <div className="flex items-center gap-1 flex-wrap justify-end flex-shrink-0">
                             <button
@@ -1417,6 +1484,13 @@ export default function TestsPage() {
                               style={BTN(true, "#f97316")}
                             >
                               Test via Claude Code
+                            </button>
+                            <button
+                              onClick={() => openWorkflowRun("opencode", wf.id)}
+                              className="px-2 py-1 rounded text-[11px] whitespace-nowrap"
+                              style={BTN(true, "#a855f7")}
+                            >
+                              Test via Opencode
                             </button>
                             <button
                               onClick={() => setEditingWorkflow(wf)}

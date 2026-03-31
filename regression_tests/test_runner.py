@@ -153,14 +153,21 @@ async def main() -> None:
     case_by_id = {tc.get("id", ""): tc for tc in all_cases if tc.get("id")}
     workflow_by_id = {wf.get("id", ""): wf for wf in all_workflows if wf.get("id")}
 
-    selected_case_ids = {
-        c.strip() for c in args.cases.split(",") if c.strip()
-    }
-    selected_workflow_ids = {
-        w.strip() for w in args.workflows.split(",") if w.strip()
-    }
+    selected_case_ids = [c.strip() for c in args.cases.split(",") if c.strip()]
+    selected_workflow_ids = [w.strip() for w in args.workflows.split(",") if w.strip()]
 
-    requested_case_ids: set[str] = set(selected_case_ids)
+    selected_case_ids = list(dict.fromkeys(selected_case_ids))
+    selected_workflow_ids = list(dict.fromkeys(selected_workflow_ids))
+
+    requested_case_order: list[str] = []
+    requested_seen: set[str] = set()
+
+    def push_requested(case_id: str) -> None:
+        if not case_id or case_id in requested_seen:
+            return
+        requested_seen.add(case_id)
+        requested_case_order.append(case_id)
+
     for wf_id in selected_workflow_ids:
         wf = workflow_by_id.get(wf_id)
         if not wf:
@@ -168,10 +175,13 @@ async def main() -> None:
             continue
         for cid in wf.get("case_ids", []):
             if isinstance(cid, str) and cid:
-                requested_case_ids.add(cid)
+                push_requested(cid)
 
-    def include_with_dependencies(case_id: str, acc: set[str], visiting: set[str]) -> None:
-        if case_id in acc:
+    for cid in selected_case_ids:
+        push_requested(cid)
+
+    def include_with_dependencies(case_id: str, ordered: list[str], added: set[str], visiting: set[str]) -> None:
+        if case_id in added:
             return
         if case_id in visiting:
             return
@@ -181,18 +191,24 @@ async def main() -> None:
         visiting.add(case_id)
         dep = case.get("depends_on")
         if isinstance(dep, str) and dep:
-            include_with_dependencies(dep, acc, visiting)
+            include_with_dependencies(dep, ordered, added, visiting)
         visiting.remove(case_id)
-        acc.add(case_id)
+        added.add(case_id)
+        ordered.append(case_id)
 
-    final_case_ids: set[str] = set()
-    if requested_case_ids:
-        for case_id in requested_case_ids:
-            include_with_dependencies(case_id, final_case_ids, set())
+    final_case_order: list[str] = []
+    if requested_case_order:
+        final_case_ids: set[str] = set()
+        for case_id in requested_case_order:
+            include_with_dependencies(case_id, final_case_order, final_case_ids, set())
 
     enabled_cases = [tc for tc in all_cases if tc.get("enabled", True)]
-    if final_case_ids:
-        enabled_cases = [tc for tc in enabled_cases if tc.get("id") in final_case_ids]
+    if final_case_order:
+        enabled_cases = [
+            case_by_id[case_id]
+            for case_id in final_case_order
+            if case_id in case_by_id and case_by_id[case_id].get("enabled", True)
+        ]
 
     if not enabled_cases:
         print("No enabled test cases found.")
@@ -274,8 +290,8 @@ async def main() -> None:
         "project": slug,
         "run_id": run_id,
         "started_at": datetime.now(timezone.utc).isoformat(),
-        "selected_workflows": sorted(selected_workflow_ids),
-        "selected_cases": sorted(selected_case_ids),
+        "selected_workflows": selected_workflow_ids,
+        "selected_cases": selected_case_ids,
         "total": len(results),
         "passed": passed_count,
         "failed": failed_count,
