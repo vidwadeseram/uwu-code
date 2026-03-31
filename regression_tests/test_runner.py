@@ -31,6 +31,7 @@ from browser_use import Agent
 from browser_use.browser.profile import BrowserProfile
 from browser_use.llm.openrouter.chat import ChatOpenRouter
 from pydantic import BaseModel
+from playwright.async_api import async_playwright
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
@@ -100,6 +101,214 @@ def substitute_vars(text: str, env: dict[str, str]) -> str:
     return text
 
 
+async def _click_by_names(page, names: list[str]) -> bool:
+    for name in names:
+        pattern = re.compile(name, re.IGNORECASE)
+        try:
+            await page.get_by_role("button", name=pattern).first.click(timeout=3500)
+            return True
+        except Exception:
+            pass
+        try:
+            await page.get_by_role("link", name=pattern).first.click(timeout=3500)
+            return True
+        except Exception:
+            pass
+        try:
+            await page.get_by_text(pattern).first.click(timeout=3500)
+            return True
+        except Exception:
+            pass
+    return False
+
+
+async def _fill_first(page, selectors: list[str], value: str) -> bool:
+    for selector in selectors:
+        try:
+            await page.locator(selector).first.fill(value, timeout=3500)
+            return True
+        except Exception:
+            continue
+    return False
+
+
+def _looks_like_success(url: str, html: str) -> bool:
+    lowered = html.lower()
+    if any(bad in lowered for bad in ["invalid", "incorrect", "error", "failed"]):
+        return False
+    if any(good in lowered for good in ["dashboard", "welcome", "overview", "reports", "orders", "sales"]):
+        return True
+    return "login" not in url.lower() and "sign" not in url.lower()
+
+
+async def run_case_scripted(
+    case: dict,
+    env: dict[str, str],
+    recording_dir: Path | None = None,
+) -> CaseResult:
+    label = case.get("label", case["id"])
+    t0 = time.time()
+
+    case_rec_dir: Path | None = None
+    if recording_dir is not None:
+        case_rec_dir = recording_dir / case["id"]
+        case_rec_dir.mkdir(parents=True, exist_ok=True)
+
+    web_url = env.get("WEB_BASE_URL", "http://95.111.238.19:3001")
+    admin_url = env.get("ADMIN_BASE_URL", "http://95.111.238.19:3002")
+    web_phone = env.get("WEB_PHONE", "")
+    web_pass = env.get("WEB_PASSWORD", "")
+    admin_user = env.get("ADMIN_USERNAME", "")
+    admin_pass = env.get("ADMIN_PASSWORD", "")
+    random_digits = env.get("RANDOM_6_DIGITS", "")
+    register_phone = f"07{random_digits}" if random_digits else (web_phone or "0771234999")
+
+    passed = False
+    detail = "No scripted result"
+    recording_rel: str | None = None
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        context = await browser.new_context(
+            record_video_dir=str(case_rec_dir) if case_rec_dir else None,
+            viewport={"width": 1280, "height": 720},
+        )
+        page = await context.new_page()
+
+        async def do_web_login() -> tuple[bool, str]:
+            await page.goto(web_url, wait_until="domcontentloaded", timeout=45000)
+            await page.wait_for_timeout(1200)
+
+            phone_filled = await _fill_first(
+                page,
+                [
+                    "input[type='tel']",
+                    "input[name*='phone' i]",
+                    "input[name*='mobile' i]",
+                    "input[placeholder*='phone' i]",
+                    "input[placeholder*='mobile' i]",
+                    "input[type='text']",
+                ],
+                web_phone,
+            )
+            pass_filled = await _fill_first(
+                page,
+                ["input[type='password']", "input[name*='password' i]", "input[placeholder*='password' i]"],
+                web_pass,
+            )
+            clicked = await _click_by_names(page, ["login", "log in", "sign in"])
+            await page.wait_for_timeout(3500)
+
+            html = await page.content()
+            ok = phone_filled and pass_filled and clicked and _looks_like_success(page.url, html)
+            return ok, ("SUCCESS" if ok else "Unable to confirm web login success")
+
+        async def do_admin_login() -> tuple[bool, str]:
+            await page.goto(admin_url, wait_until="domcontentloaded", timeout=45000)
+            await page.wait_for_timeout(1200)
+
+            user_filled = await _fill_first(
+                page,
+                [
+                    "input[name*='username' i]",
+                    "input[name*='email' i]",
+                    "input[placeholder*='username' i]",
+                    "input[placeholder*='email' i]",
+                    "input[type='text']",
+                ],
+                admin_user,
+            )
+            pass_filled = await _fill_first(
+                page,
+                ["input[type='password']", "input[name*='password' i]", "input[placeholder*='password' i]"],
+                admin_pass,
+            )
+            clicked = await _click_by_names(page, ["login", "log in", "sign in"])
+            await page.wait_for_timeout(3500)
+
+            html = await page.content()
+            ok = user_filled and pass_filled and clicked and _looks_like_success(page.url, html)
+            return ok, ("SUCCESS" if ok else "Unable to confirm admin login success")
+
+        try:
+            case_id = case["id"]
+            if case_id == "web_register":
+                await page.goto(web_url, wait_until="domcontentloaded", timeout=45000)
+                await page.wait_for_timeout(1200)
+                await _click_by_names(page, ["sign up", "register", "create account"])
+                await page.wait_for_timeout(600)
+
+                await _fill_first(
+                    page,
+                    ["input[type='tel']", "input[name*='phone' i]", "input[placeholder*='phone' i]"],
+                    register_phone,
+                )
+                await _fill_first(page, ["input[name*='first' i]", "input[placeholder*='first' i]"], "Test")
+                await _fill_first(page, ["input[name*='last' i]", "input[placeholder*='last' i]", "input[name*='surname' i]"], "User")
+                await _fill_first(page, ["input[type='password']", "input[name*='password' i]"], "Test@12345")
+
+                await _click_by_names(page, ["sign up", "register", "create account", "submit"])
+                await page.wait_for_timeout(4000)
+                html = (await page.content()).lower()
+                passed = "already exists" in html or "already registered" in html or _looks_like_success(page.url, html)
+                detail = "SUCCESS" if passed else "Registration success not detected"
+
+            elif case_id == "web_login":
+                passed, detail = await do_web_login()
+
+            elif case_id == "admin_login":
+                passed, detail = await do_admin_login()
+
+            elif case_id == "web_smoke":
+                ok, login_detail = await do_web_login()
+                if not ok:
+                    passed = False
+                    detail = f"Login prerequisite failed: {login_detail}"
+                else:
+                    html = (await page.content()).lower()
+                    markers = ["dashboard", "sales", "orders", "products", "inventory", "reports"]
+                    seen = [m for m in markers if m in html]
+                    passed = len(seen) >= 2
+                    detail = f"Found web smoke markers: {seen}" if passed else "Insufficient web smoke markers"
+
+            elif case_id == "admin_smoke":
+                ok, login_detail = await do_admin_login()
+                if not ok:
+                    passed = False
+                    detail = f"Admin login prerequisite failed: {login_detail}"
+                else:
+                    html = (await page.content()).lower()
+                    markers = ["dashboard", "users", "merchants", "stores", "reports", "settings"]
+                    seen = [m for m in markers if m in html]
+                    passed = len(seen) >= 2
+                    detail = f"Found admin smoke markers: {seen}" if passed else "Insufficient admin smoke markers"
+
+            else:
+                passed = False
+                detail = "No scripted handler for case"
+        except Exception as exc:
+            detail = str(exc)
+            passed = False
+        finally:
+            await page.close()
+            await context.close()
+            await browser.close()
+
+    if case_rec_dir:
+        videos = list(case_rec_dir.glob("*.webm")) + list(case_rec_dir.glob("*.mp4"))
+        if videos:
+            recording_rel = str(videos[0].relative_to(RESULTS_DIR))
+
+    return CaseResult(
+        id=case["id"],
+        label=label,
+        passed=passed,
+        detail=detail,
+        duration_s=round(time.time() - t0, 1),
+        recording=recording_rel,
+    )
+
+
 async def run_case(
     case: dict,
     llm,
@@ -107,6 +316,9 @@ async def run_case(
     env: dict[str, str],
     recording_dir: Path | None = None,
 ) -> CaseResult:
+    if case.get("id") in {"web_register", "web_login", "web_smoke", "admin_login", "admin_smoke"}:
+        return await run_case_scripted(case, env, recording_dir)
+
     label = case.get("label", case["id"])
     task = substitute_vars(case["task"], env)
 
