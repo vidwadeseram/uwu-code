@@ -8,8 +8,10 @@ regression_tests/results/<slug>/<timestamp>.json.
 Usage:
   uv run test_runner.py <project_slug> [KEY=VALUE ...]
 
-Required env vars (or pass as KEY=VALUE args):
-  OPENROUTER_API_KEY  — for OpenRouter LLM access
+LLM priority (first available key wins):
+  OPENROUTER_API_KEY  → OpenRouter (model: OPENROUTER_MODEL env, default anthropic/claude-3-5-haiku)
+  ANTHROPIC_API_KEY   → Anthropic direct (claude-3-5-haiku-20241022)
+  OPENAI_API_KEY      → OpenAI direct (gpt-4o-mini)
 
 Any {{PLACEHOLDER}} in task strings is substituted with matching env vars.
 """
@@ -26,6 +28,8 @@ from pathlib import Path
 from browser_use import Agent
 from browser_use.browser.profile import BrowserProfile
 from browser_use.llm.openrouter.chat import ChatOpenRouter
+from langchain_anthropic import ChatAnthropic
+from langchain_openai import ChatOpenAI
 
 BASE_DIR = Path(__file__).parent
 TEST_CASES_DIR = BASE_DIR / "test_cases"
@@ -51,7 +55,7 @@ def substitute_vars(text: str, env: dict[str, str]) -> str:
 
 async def run_case(
     case: dict,
-    llm: ChatOpenRouter,
+    llm,
     env: dict[str, str],
     recording_dir: Path | None = None,
 ) -> CaseResult:
@@ -150,13 +154,27 @@ async def main() -> None:
     print(f"Project: {config.get('description', slug)}\n")
 
     openrouter_key = env.get("OPENROUTER_API_KEY", "")
-    if not openrouter_key:
-        print("ERROR: OPENROUTER_API_KEY is not set")
+    anthropic_key  = env.get("ANTHROPIC_API_KEY", "")
+    openai_key     = env.get("OPENAI_API_KEY", "")
+
+    llm = None
+    llm_label = ""
+
+    if openrouter_key:
+        model = env.get("OPENROUTER_MODEL", "anthropic/claude-3-5-haiku")
+        llm = ChatOpenRouter(model=model, api_key=openrouter_key, timeout=120)
+        llm_label = f"OpenRouter / {model}"
+    elif anthropic_key:
+        llm = ChatAnthropic(model="claude-3-5-haiku-20241022", api_key=anthropic_key, timeout=120, max_tokens=8096)
+        llm_label = "Anthropic / claude-3-5-haiku-20241022"
+    elif openai_key:
+        llm = ChatOpenAI(model="gpt-4o-mini", api_key=openai_key, timeout=120)
+        llm_label = "OpenAI / gpt-4o-mini"
+    else:
+        print("ERROR: No API key set — add OPENROUTER_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY")
         sys.exit(1)
 
-    model = env.get("OPENROUTER_MODEL", "openai/gpt-4o")
-    llm = ChatOpenRouter(model=model, api_key=openrouter_key, timeout=120)
-    print(f"LLM: OpenRouter / {model}")
+    print(f"LLM: {llm_label}")
 
     # Recording directory for this run
     run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
