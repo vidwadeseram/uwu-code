@@ -215,6 +215,25 @@ else
   success "uv $(uv --version 2>/dev/null | head -1) already installed."
 fi
 
+# Make uv accessible to non-root uwu user (uv symlinks to /root/.local/bin)
+# Copy the real binary so uwu can execute it, then create a wrapper
+if [ -f "$HOME/.local/bin/uv" ] && [ ! -f /usr/local/bin/uv.real ]; then
+  cp "$HOME/.local/bin/uv" /usr/local/bin/uv.real
+  chmod 755 /usr/local/bin/uv.real
+fi
+if [ ! -f /usr/local/bin/uv ]; then
+  ln -s /usr/local/bin/uv.real /usr/local/bin/uv 2>/dev/null || true
+fi
+
+# Wrapper script that lets uwu (or any user) run uv without sudo permission issues
+if [ ! -f /usr/local/bin/uv-uwu ]; then
+  cat > /usr/local/bin/uv-uwu << 'UVUWUSCRIPT'
+#!/bin/bash
+exec /usr/local/bin/uv.real "$@"
+UVUWUSCRIPT
+  chmod 755 /usr/local/bin/uv-uwu
+fi
+
 ###############################################################################
 # Clone / update repo
 ###############################################################################
@@ -340,7 +359,7 @@ Type=simple
 User=uwu
 WorkingDirectory=$INSTALL_DIR/openclaw
 EnvironmentFile=-$INSTALL_DIR/regression_tests/.env
-ExecStart=/usr/local/bin/sudo -u uwu /usr/local/bin/uv run agent.py
+ExecStart=/usr/local/bin/uv-uwu run agent.py
 Restart=on-failure
 RestartSec=10
 
