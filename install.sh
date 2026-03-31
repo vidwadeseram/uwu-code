@@ -95,7 +95,8 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   ufw net-tools iproute2 \
   nginx certbot python3-certbot-nginx \
   cmake libjson-c-dev libwebsockets-dev \
-  ca-certificates gnupg python3-pip stow 2>/dev/null || true
+  ca-certificates gnupg python3-pip stow \
+  ffmpeg 2>/dev/null || true
 
 success "System packages installed."
 
