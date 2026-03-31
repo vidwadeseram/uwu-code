@@ -14,6 +14,8 @@ import subprocess
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import re
+from typing import Any
 
 AGENT_DIR = Path(__file__).parent
 DATA_DIR = AGENT_DIR / "data"
@@ -23,6 +25,8 @@ LOG_FILE = DATA_DIR / "agent.log"
 SETTINGS_FILE = AGENT_DIR.parent / "settings.json"
 ENV_FILE = AGENT_DIR.parent / "regression_tests" / ".env"
 POLL_INTERVAL = 10  # seconds
+
+TaskDict = dict[str, Any]
 
 
 # ── bootstrap ────────────────────────────────────────────────────────────────
@@ -66,7 +70,7 @@ def log(msg: str) -> None:
 
 # ── task persistence ──────────────────────────────────────────────────────────
 
-def load_tasks() -> list[dict]:
+def load_tasks() -> list[TaskDict]:
     if not TASKS_FILE.exists():
         return []
     try:
@@ -75,11 +79,11 @@ def load_tasks() -> list[dict]:
         return []
 
 
-def save_tasks(tasks: list[dict]) -> None:
+def save_tasks(tasks: list[TaskDict]) -> None:
     TASKS_FILE.write_text(json.dumps(tasks, indent=2))
 
 
-def update_task(task_id: str, **fields) -> None:
+def update_task(task_id: str, **fields: Any) -> None:
     tasks = load_tasks()
     for t in tasks:
         if t["id"] == task_id:
@@ -109,34 +113,106 @@ RATE_LIMIT_PHRASES = [
     "529", "credit", "billing",
 ]
 
+SUNDAY_BASED_WEEKDAY = {
+    0: 6,
+    1: 0,
+    2: 1,
+    3: 2,
+    4: 3,
+    5: 4,
+    6: 5,
+}
+
 
 def is_rate_limited(text: str) -> bool:
     lo = text.lower()
     return any(p in lo for p in RATE_LIMIT_PHRASES)
 
 
-def get_next_task(tasks: list[dict]) -> dict | None:
+def parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+        if not parsed.tzinfo:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def parse_schedule_time(value: str | None) -> tuple[int, int] | None:
+    if not value or not re.match(r"^(?:[01]\d|2[0-3]):[0-5]\d$", value):
+        return None
+    hour, minute = value.split(":")
+    return int(hour), int(minute)
+
+
+def next_daily_run(task: TaskDict, now: datetime) -> datetime:
+    parsed_time = parse_schedule_time(task.get("schedule_time"))
+    if parsed_time:
+        hour, minute = parsed_time
+        candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        if candidate <= now:
+            candidate += timedelta(days=1)
+        return candidate
+
+    candidate = parse_iso_datetime(task.get("scheduled_at")) or now
+    while candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate
+
+
+def next_weekly_run(task: TaskDict, now: datetime) -> datetime:
+    parsed_time = parse_schedule_time(task.get("schedule_time"))
+    weekday = task.get("schedule_weekday")
+
+    if parsed_time and isinstance(weekday, int) and 0 <= weekday <= 6:
+        py_weekday = SUNDAY_BASED_WEEKDAY[weekday]
+        days_ahead = (py_weekday - now.weekday() + 7) % 7
+        hour, minute = parsed_time
+        candidate = (now + timedelta(days=days_ahead)).replace(
+            hour=hour,
+            minute=minute,
+            second=0,
+            microsecond=0,
+        )
+        if candidate <= now:
+            candidate += timedelta(days=7)
+        return candidate
+
+    candidate = parse_iso_datetime(task.get("scheduled_at")) or now
+    while candidate <= now:
+        candidate += timedelta(days=7)
+    return candidate
+
+
+def compute_next_recurring_run(task: TaskDict, now: datetime) -> datetime | None:
+    mode = task.get("schedule_mode", "anytime")
+    if mode == "daily":
+        return next_daily_run(task, now)
+    if mode == "weekly":
+        return next_weekly_run(task, now)
+    return None
+
+
+def get_next_task(tasks: list[TaskDict]) -> TaskDict | None:
     now = datetime.now(timezone.utc)
     for task in tasks:
         if task["status"] == "pending":
             return task
+        if task["status"] == "manual":
+            continue
         if task["status"] == "scheduled":
-            sat = task.get("scheduled_at")
-            if sat:
-                try:
-                    t = datetime.fromisoformat(sat)
-                    if not t.tzinfo:
-                        t = t.replace(tzinfo=timezone.utc)
-                    if t <= now:
-                        return task
-                except Exception:
-                    pass
+            t = parse_iso_datetime(task.get("scheduled_at"))
+            if t and t <= now:
+                return task
     return None
 
 
 # ── executors ────────────────────────────────────────────────────────────────
 
-def run_coding_task(task: dict) -> tuple[bool | None, str]:
+def run_coding_task(task: TaskDict) -> tuple[bool | None, str]:
     """
     Returns (True, output) on success, (False, output) on failure,
     (None, output) if rate-limited.
@@ -192,7 +268,7 @@ def run_coding_task(task: dict) -> tuple[bool | None, str]:
     return False, f"All tools failed.\n\nLast output:\n{last_output}"
 
 
-def run_research_task(task: dict) -> tuple[bool | None, str]:
+def run_research_task(task: TaskDict) -> tuple[bool | None, str]:
     desc = task["description"]
     log("  → running research via LLM API")
 
@@ -210,7 +286,7 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
     # ── 1. OpenRouter (preferred — most flexible, access to many models) ──────
     if openrouter_key:
         try:
-            import openai as oai
+            oai = __import__("openai")
             client = oai.OpenAI(
                 api_key=openrouter_key,
                 base_url="https://openrouter.ai/api/v1",
@@ -230,7 +306,7 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
     # ── 2. Anthropic direct ───────────────────────────────────────────────────
     if anthropic_key:
         try:
-            import anthropic
+            anthropic = __import__("anthropic")
             client = anthropic.Anthropic(api_key=anthropic_key)
             msg = client.messages.create(
                 model="claude-opus-4-5-20251101",
@@ -247,7 +323,7 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
     # ── 3. OpenAI direct ──────────────────────────────────────────────────────
     if openai_key:
         try:
-            import openai as oai
+            oai = __import__("openai")
             client = oai.OpenAI(api_key=openai_key)
             resp = client.chat.completions.create(
                 model="gpt-4o",
@@ -265,8 +341,9 @@ def run_research_task(task: dict) -> tuple[bool | None, str]:
 
 # ── task runner ───────────────────────────────────────────────────────────────
 
-def process_task(task: dict) -> None:
+def process_task(task: TaskDict) -> None:
     tid = task["id"]
+    schedule_mode = task.get("schedule_mode", "anytime")
     log(f"Starting task [{tid}] type={task.get('type','research')}: {task['description'][:80]}")
 
     update_task(tid, status="running", started_at=now_iso())
@@ -294,30 +371,96 @@ def process_task(task: dict) -> None:
     header += f"**Completed:** {now_iso()}  \n\n---\n\n"
 
     if result is None:
-        scheduled = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
-        update_task(
-            tid,
-            status="scheduled",
-            scheduled_at=scheduled,
-            report=f"{header}⏳ Rate limited. Auto-rescheduled for **{scheduled}**.\n\nAPI response:\n```\n{output[:2000]}\n```",
+        rate_limited_report = (
+            f"{header}⏳ Rate limited.\n\n"
+            f"API response:\n```\n{output[:2000]}\n```"
         )
-        log(f"  Rate limited → rescheduled to {scheduled}")
+        if schedule_mode == "manual":
+            update_task(
+                tid,
+                status="manual",
+                last_run_at=now_iso(),
+                last_run_status="failed",
+                report=rate_limited_report,
+            )
+            log("  Rate limited (manual task remains manual)")
+        else:
+            scheduled = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+            update_task(
+                tid,
+                status="scheduled",
+                scheduled_at=scheduled,
+                last_run_at=now_iso(),
+                last_run_status="failed",
+                report=f"{rate_limited_report}\n\nAuto-rescheduled for **{scheduled}**.",
+            )
+            log(f"  Rate limited → rescheduled to {scheduled}")
     elif result:
-        update_task(
-            tid,
-            status="completed",
-            completed_at=now_iso(),
-            report=header + output,
-        )
-        log(f"  Completed successfully")
+        next_run = compute_next_recurring_run(task, datetime.now(timezone.utc))
+        if schedule_mode == "manual":
+            update_task(
+                tid,
+                status="manual",
+                completed_at=now_iso(),
+                last_run_at=now_iso(),
+                last_run_status="completed",
+                report=header + output,
+            )
+            log("  Completed successfully (manual task reset)")
+        elif next_run:
+            update_task(
+                tid,
+                status="scheduled",
+                scheduled_at=next_run.isoformat(),
+                completed_at=now_iso(),
+                last_run_at=now_iso(),
+                last_run_status="completed",
+                report=header + output,
+            )
+            log(f"  Completed successfully → next run at {next_run.isoformat()}")
+        else:
+            update_task(
+                tid,
+                status="completed",
+                completed_at=now_iso(),
+                last_run_at=now_iso(),
+                last_run_status="completed",
+                report=header + output,
+            )
+            log(f"  Completed successfully")
     else:
-        update_task(
-            tid,
-            status="failed",
-            completed_at=now_iso(),
-            report=f"{header}❌ Failed:\n\n```\n{output}\n```",
-        )
-        log(f"  Failed")
+        next_run = compute_next_recurring_run(task, datetime.now(timezone.utc))
+        if schedule_mode == "manual":
+            update_task(
+                tid,
+                status="manual",
+                completed_at=now_iso(),
+                last_run_at=now_iso(),
+                last_run_status="failed",
+                report=f"{header}❌ Failed:\n\n```\n{output}\n```",
+            )
+            log("  Failed (manual task reset)")
+        elif next_run:
+            update_task(
+                tid,
+                status="scheduled",
+                scheduled_at=next_run.isoformat(),
+                completed_at=now_iso(),
+                last_run_at=now_iso(),
+                last_run_status="failed",
+                report=f"{header}❌ Failed:\n\n```\n{output}\n```",
+            )
+            log(f"  Failed → next run at {next_run.isoformat()}")
+        else:
+            update_task(
+                tid,
+                status="failed",
+                completed_at=now_iso(),
+                last_run_at=now_iso(),
+                last_run_status="failed",
+                report=f"{header}❌ Failed:\n\n```\n{output}\n```",
+            )
+            log(f"  Failed")
 
     update_status("idle")
 
