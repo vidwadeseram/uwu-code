@@ -6,22 +6,12 @@ const PUBLIC_API_PATHS = new Set([
   "/api/auth/check",
 ]);
 
-async function checkAuthenticated(request: NextRequest): Promise<boolean> {
-  try {
-    const checkUrl = new URL("/api/auth/check", request.url);
-    const response = await fetch(checkUrl, {
-      headers: {
-        cookie: request.headers.get("cookie") ?? "",
-      },
-      cache: "no-store",
-    });
-    return response.ok;
-  } catch {
-    return false;
-  }
+function hasSessionCookie(request: NextRequest): boolean {
+  const token = request.cookies.get("uwu_session")?.value;
+  return typeof token === "string" && token.trim().length > 0;
 }
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (pathname.startsWith("/_next") || pathname === "/favicon.ico") {
@@ -32,7 +22,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const authenticated = await checkAuthenticated(request);
+  const authenticated = hasSessionCookie(request);
 
   if (pathname === LOGIN_PATH) {
     if (authenticated) {
