@@ -505,7 +505,18 @@ export default function TestsPage() {
     loadEnvVars(selectedProject);
     setEditingCase(null);
     setShowNewForm(false);
-  }, [selectedProject, loadConfig, loadResults, loadEnvVars]);
+    // Re-attach polling if a run is already in progress (survives page refresh)
+    fetch(`/api/tests/run?project=${encodeURIComponent(selectedProject)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.running) {
+          setRunning(true);
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = setInterval(() => pollRunStatus(selectedProject), 5000);
+        }
+      })
+      .catch(() => {});
+  }, [selectedProject, loadConfig, loadResults, loadEnvVars, pollRunStatus]);
 
   // Save config to server
   const saveConfig = useCallback(async (updated: TestConfig) => {

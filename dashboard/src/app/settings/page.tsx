@@ -354,6 +354,7 @@ interface ORModel {
   context_length: number;
   free: boolean;
   prompt_price_per_m: number;
+  vision: boolean;
 }
 
 function ModelPicker({
@@ -362,12 +363,14 @@ function ModelPicker({
   onChange,
   models,
   loading,
+  requireVision,
 }: {
   label: string;
   value: string;
   onChange: (id: string) => void;
   models: ORModel[];
   loading: boolean;
+  requireVision?: boolean;
 }) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -475,6 +478,12 @@ function ModelPicker({
       {selected && (
         <div className="text-xs font-mono" style={{ color: "#2e4a7a" }}>{selected.id}</div>
       )}
+      {requireVision && selected && !selected.vision && (
+        <div className="text-xs px-3 py-2 rounded flex items-center gap-2" style={{ background: "rgba(255,165,0,0.08)", color: "#ffa500", border: "1px solid rgba(255,165,0,0.25)" }}>
+          <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          This model may not support image input. browser-use sends page screenshots at every step — pick a vision-capable model to avoid errors.
+        </div>
+      )}
     </div>
   );
 }
@@ -546,6 +555,7 @@ function ModelsSection() {
           onChange={setTestsModel}
           models={models}
           loading={loading}
+          requireVision
         />
         <ModelPicker
           label="OpenClaw (research & chat)"

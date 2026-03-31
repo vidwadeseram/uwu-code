@@ -10,6 +10,7 @@ export interface ORModel {
   pricing: { prompt: string; completion: string };
   free: boolean;
   prompt_price_per_m: number; // USD per 1M tokens
+  vision: boolean; // accepts image input (required for browser-use)
 }
 
 export async function GET(_req: NextRequest) {
@@ -41,10 +42,12 @@ export async function GET(_req: NextRequest) {
             if (modality && !modality.includes("text")) return false;
             return true;
           })
-          .map((m: { id: string; name: string; context_length?: number; pricing?: { prompt?: string; completion?: string } }) => {
+          .map((m: { id: string; name: string; context_length?: number; pricing?: { prompt?: string; completion?: string }; modality?: string; architecture?: { modality?: string } }) => {
           const promptPrice = parseFloat(m.pricing?.prompt ?? "0");
           const completionPrice = parseFloat(m.pricing?.completion ?? "0");
           const free = promptPrice === 0 && completionPrice === 0;
+          const modality = m.modality ?? m.architecture?.modality ?? "";
+          const vision = modality.includes("image") || modality.includes("vision");
           return {
             id: m.id,
             name: m.name ?? m.id,
@@ -52,6 +55,7 @@ export async function GET(_req: NextRequest) {
             pricing: { prompt: m.pricing?.prompt ?? "0", completion: m.pricing?.completion ?? "0" },
             free,
             prompt_price_per_m: Math.round(promptPrice * 1_000_000 * 100) / 100,
+            vision,
           };
         }).sort((a: ORModel, b: ORModel) => {
           // Free first, then by name
