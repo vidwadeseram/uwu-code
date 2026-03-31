@@ -150,12 +150,20 @@ success "Dotfiles applied."
 ###############################################################################
 # Claude Code CLI
 ###############################################################################
+# Claude Code CLI
+###############################################################################
 if ! command -v claude &>/dev/null; then
   info "Installing Claude Code..."
   npm install -g @anthropic-ai/claude-code >/dev/null 2>&1
   success "Claude Code installed."
 else
   success "Claude Code already installed."
+fi
+# Claude binary may be installed under /root/.local which non-root users can't
+# traverse. Copy the real binary to /usr/local/bin so the uwu user can run it.
+CLAUDE_REAL=$(readlink -f "$(command -v claude 2>/dev/null || echo '')" 2>/dev/null || true)
+if [ -f "$CLAUDE_REAL" ] && [ "$CLAUDE_REAL" != "/usr/local/bin/claude" ]; then
+  install -m 755 "$CLAUDE_REAL" /usr/local/bin/claude
 fi
 
 ###############################################################################
