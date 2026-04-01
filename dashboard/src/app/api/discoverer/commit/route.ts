@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
+import { allowedWorkspaceRoots } from "@/app/lib/discoverer";
 
 export const dynamic = "force-dynamic";
 
-const REPO_ROOT = path.join(process.cwd(), "..");
+const DASHBOARD_REPO_ROOT = path.join(process.cwd(), "..");
 
 interface CommitRequest {
   files?: string[];
@@ -17,43 +19,69 @@ interface GitRunResult {
   code: number;
 }
 
+interface TargetFile {
+  abs: string;
+  rel: string;
+}
+
 function normalizeRepoPath(input: string): string {
-  return path.resolve(input).replace(/\\/g, "/");
+  return path.resolve(input).replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
-function isUnderRepoRoot(candidate: string): boolean {
-  const root = normalizeRepoPath(REPO_ROOT);
-  const resolved = normalizeRepoPath(candidate);
-  return resolved === root || resolved.startsWith(`${root}/`);
+function allowedGitRoots(): string[] {
+  return Array.from(
+    new Set([
+      normalizeRepoPath(DASHBOARD_REPO_ROOT),
+      ...allowedWorkspaceRoots().map((root) => normalizeRepoPath(root)),
+    ])
+  );
 }
 
-function runGit(args: string[]): Promise<GitRunResult> {
+function isUnderAnyAllowedRoot(candidate: string): boolean {
+  const normalized = normalizeRepoPath(candidate);
+  return allowedGitRoots().some((root) => normalized === root || normalized.startsWith(`${root}/`));
+}
+
+function runGit(cwd: string, args: string[]): Promise<GitRunResult> {
   return new Promise((resolve) => {
-    execFile(
-      "git",
-      args,
-      { cwd: REPO_ROOT, maxBuffer: 10 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        let code = 0;
-        if (error) {
-          const rawCode = (error as NodeJS.ErrnoException).code;
-          if (typeof rawCode === "number") {
-            code = rawCode;
-          } else if (typeof rawCode === "string") {
-            const parsedCode = Number(rawCode);
-            code = Number.isFinite(parsedCode) ? parsedCode : 1;
-          } else {
-            code = 1;
-          }
+    execFile("git", args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      let code = 0;
+      if (error) {
+        const rawCode = (error as NodeJS.ErrnoException).code;
+        if (typeof rawCode === "number") {
+          code = rawCode;
+        } else if (typeof rawCode === "string") {
+          const parsedCode = Number(rawCode);
+          code = Number.isFinite(parsedCode) ? parsedCode : 1;
+        } else {
+          code = 1;
         }
-        resolve({
-          stdout: stdout ?? "",
-          stderr: stderr ?? "",
-          code,
-        });
       }
-    );
+      resolve({
+        stdout: stdout ?? "",
+        stderr: stderr ?? "",
+        code,
+      });
+    });
   });
+}
+
+async function discoverGitRoot(absPath: string): Promise<string | null> {
+  const probePath = (() => {
+    try {
+      if (fs.existsSync(absPath) && fs.statSync(absPath).isDirectory()) {
+        return absPath;
+      }
+    } catch {}
+    return path.dirname(absPath);
+  })();
+
+  const rootResult = await runGit(probePath, ["rev-parse", "--show-toplevel"]);
+  if (rootResult.code !== 0) return null;
+  const root = normalizeRepoPath(rootResult.stdout.trim());
+  if (!root) return null;
+  if (!isUnderAnyAllowedRoot(root)) return null;
+  return root;
 }
 
 export async function POST(req: NextRequest) {
@@ -74,43 +102,84 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Commit message required" }, { status: 400 });
   }
 
-  const targets = parsed.files
-    .map((filePath) => (typeof filePath === "string" ? filePath.trim() : ""))
-    .filter(Boolean)
-    .map((filePath) => path.resolve(filePath))
-    .filter(isUnderRepoRoot)
-    .map((abs) => path.relative(REPO_ROOT, abs).replace(/\\/g, "/"));
+  const byRepo = new Map<string, TargetFile[]>();
 
-  if (targets.length === 0) {
-    return NextResponse.json({ error: "No valid files under repository root" }, { status: 400 });
+  for (const rawFile of parsed.files) {
+    const trimmed = typeof rawFile === "string" ? rawFile.trim() : "";
+    if (!trimmed) continue;
+    const abs = path.resolve(trimmed);
+    if (!isUnderAnyAllowedRoot(abs)) continue;
+
+    const repoRoot = await discoverGitRoot(abs);
+    if (!repoRoot) continue;
+
+    const rel = path.relative(repoRoot, abs).replace(/\\/g, "/");
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) continue;
+
+    const group = byRepo.get(repoRoot) ?? [];
+    if (!group.some((entry) => entry.rel === rel)) {
+      group.push({ abs, rel });
+      byRepo.set(repoRoot, group);
+    }
   }
 
-  const addResult = await runGit(["-C", REPO_ROOT, "add", "--", ...targets]);
-  if (addResult.code !== 0) {
-    return NextResponse.json({ error: addResult.stderr || "git add failed" }, { status: 500 });
+  if (byRepo.size === 0) {
+    return NextResponse.json({ error: "No valid files under allowed git repositories" }, { status: 400 });
   }
 
-  const stagedResult = await runGit(["-C", REPO_ROOT, "diff", "--cached", "--name-only", "--", ...targets]);
-  const stagedFiles = stagedResult.stdout
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const commits: Array<{ repoRoot: string; commit: string; summary: string; files: string[] }> = [];
+  const committedFiles: string[] = [];
 
-  if (stagedFiles.length === 0) {
+  for (const [repoRoot, targets] of Array.from(byRepo.entries())) {
+    const relTargets = targets.map((t) => t.rel);
+    const addResult = await runGit(repoRoot, ["add", "--", ...relTargets]);
+    if (addResult.code !== 0) {
+      return NextResponse.json(
+        { error: `git add failed in ${repoRoot}: ${addResult.stderr || addResult.stdout || "unknown error"}` },
+        { status: 500 }
+      );
+    }
+
+    const stagedResult = await runGit(repoRoot, ["diff", "--cached", "--name-only", "--", ...relTargets]);
+    const stagedFiles = stagedResult.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (stagedFiles.length === 0) {
+      continue;
+    }
+
+    const commitResult = await runGit(repoRoot, ["commit", "-m", message]);
+    if (commitResult.code !== 0) {
+      return NextResponse.json(
+        { error: `git commit failed in ${repoRoot}: ${commitResult.stderr || commitResult.stdout || "unknown error"}` },
+        { status: 500 }
+      );
+    }
+
+    const headResult = await runGit(repoRoot, ["rev-parse", "--short", "HEAD"]);
+    const hash = headResult.stdout.trim();
+    const absoluteFiles = stagedFiles.map((rel) => path.join(repoRoot, rel).replace(/\\/g, "/"));
+
+    commits.push({
+      repoRoot,
+      commit: hash,
+      summary: commitResult.stdout.trim(),
+      files: absoluteFiles,
+    });
+    committedFiles.push(...absoluteFiles);
+  }
+
+  if (commits.length === 0) {
     return NextResponse.json({ error: "No staged changes to commit" }, { status: 400 });
   }
 
-  const commitResult = await runGit(["-C", REPO_ROOT, "commit", "-m", message]);
-  if (commitResult.code !== 0) {
-    return NextResponse.json({ error: commitResult.stderr || commitResult.stdout || "git commit failed" }, { status: 500 });
-  }
-
-  const headResult = await runGit(["-C", REPO_ROOT, "rev-parse", "--short", "HEAD"]);
-
   return NextResponse.json({
     ok: true,
-    commit: headResult.stdout.trim(),
-    summary: commitResult.stdout.trim(),
-    files: stagedFiles,
+    commit: commits.length === 1 ? commits[0].commit : `${commits.length} commits`,
+    summary: commits.map((entry) => `[${entry.repoRoot}] ${entry.summary}`).join("\n\n"),
+    files: committedFiles,
+    commits,
   });
 }

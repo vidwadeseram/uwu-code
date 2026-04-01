@@ -61,12 +61,15 @@ interface DiscovererResponse {
 
 interface ReviewFile {
   path: string;
+  relPath?: string;
+  repoRoot?: string;
   status: string;
   diff: string;
 }
 
 interface ReviewResponse {
   repoRoot: string;
+  repoRoots?: string[];
   hasChanges: boolean;
   files: ReviewFile[];
 }
@@ -726,7 +729,15 @@ export default function DiscovererPage() {
             {review && (
               <div className="space-y-2">
                 <div className="text-xs" style={{ color: "#94a3b8" }}>
-                  Repo: <span className="font-mono" style={{ color: "#e2e8f0" }}>{review.repoRoot}</span>
+                  {Array.isArray(review.repoRoots) && review.repoRoots.length > 1 ? (
+                    <>
+                      Repos: <span className="font-mono" style={{ color: "#e2e8f0" }}>{review.repoRoots.join(" · ")}</span>
+                    </>
+                  ) : (
+                    <>
+                      Repo: <span className="font-mono" style={{ color: "#e2e8f0" }}>{review.repoRoot}</span>
+                    </>
+                  )}
                 </div>
 
                 <div className="space-y-2 max-h-[320px] overflow-auto pr-1">
@@ -737,7 +748,12 @@ export default function DiscovererPage() {
                       style={{ background: "#0f172a", border: "1px solid #1e2d4a" }}
                     >
                       <summary className="px-3 py-2 cursor-pointer list-none flex items-center justify-between gap-2">
-                        <span className="text-xs font-mono" style={{ color: "#e2e8f0" }}>{file.path}</span>
+                        <span className="text-xs font-mono" style={{ color: "#e2e8f0" }}>
+                          {file.relPath ?? file.path}
+                          {file.repoRoot && (
+                            <span style={{ color: "#64748b" }}> ({file.repoRoot})</span>
+                          )}
+                        </span>
                         <span className="text-[10px] px-2 py-0.5 rounded uppercase" style={{ color: statusColor(file.status), border: `1px solid ${statusColor(file.status)}55` }}>
                           {file.status}
                         </span>

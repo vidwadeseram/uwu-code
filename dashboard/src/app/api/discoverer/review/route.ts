@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
 import { execFile } from "child_process";
+import { allowedWorkspaceRoots } from "@/app/lib/discoverer";
 
 export const dynamic = "force-dynamic";
 
-const REPO_ROOT = path.join(process.cwd(), "..");
+const DASHBOARD_REPO_ROOT = path.join(process.cwd(), "..");
 const MAX_DIFF_CHARS = 120_000;
 
 interface ReviewRequest {
@@ -18,14 +19,27 @@ interface GitRunResult {
   code: number;
 }
 
-function normalizeRepoPath(input: string): string {
-  return path.resolve(input).replace(/\\/g, "/");
+interface TargetFile {
+  abs: string;
+  rel: string;
 }
 
-function isUnderRepoRoot(candidate: string): boolean {
-  const root = normalizeRepoPath(REPO_ROOT);
-  const resolved = normalizeRepoPath(candidate);
-  return resolved === root || resolved.startsWith(`${root}/`);
+function normalizeRepoPath(input: string): string {
+  return path.resolve(input).replace(/\\/g, "/").replace(/\/+$/, "");
+}
+
+function allowedGitRoots(): string[] {
+  return Array.from(
+    new Set([
+      normalizeRepoPath(DASHBOARD_REPO_ROOT),
+      ...allowedWorkspaceRoots().map((root) => normalizeRepoPath(root)),
+    ])
+  );
+}
+
+function isUnderAnyAllowedRoot(candidate: string): boolean {
+  const normalized = normalizeRepoPath(candidate);
+  return allowedGitRoots().some((root) => normalized === root || normalized.startsWith(`${root}/`));
 }
 
 function normalizeGitPath(filePath: string): string {
@@ -42,33 +56,46 @@ function classifyStatus(status: string): string {
   return "staged";
 }
 
-function runGit(args: string[]): Promise<GitRunResult> {
+function runGit(cwd: string, args: string[]): Promise<GitRunResult> {
   return new Promise((resolve) => {
-    execFile(
-      "git",
-      args,
-      { cwd: REPO_ROOT, maxBuffer: 10 * 1024 * 1024 },
-      (error, stdout, stderr) => {
-        let code = 0;
-        if (error) {
-          const rawCode = (error as NodeJS.ErrnoException).code;
-          if (typeof rawCode === "number") {
-            code = rawCode;
-          } else if (typeof rawCode === "string") {
-            const parsedCode = Number(rawCode);
-            code = Number.isFinite(parsedCode) ? parsedCode : 1;
-          } else {
-            code = 1;
-          }
+    execFile("git", args, { cwd, maxBuffer: 10 * 1024 * 1024 }, (error, stdout, stderr) => {
+      let code = 0;
+      if (error) {
+        const rawCode = (error as NodeJS.ErrnoException).code;
+        if (typeof rawCode === "number") {
+          code = rawCode;
+        } else if (typeof rawCode === "string") {
+          const parsedCode = Number(rawCode);
+          code = Number.isFinite(parsedCode) ? parsedCode : 1;
+        } else {
+          code = 1;
         }
-        resolve({
-          stdout: stdout ?? "",
-          stderr: stderr ?? "",
-          code,
-        });
       }
-    );
+      resolve({
+        stdout: stdout ?? "",
+        stderr: stderr ?? "",
+        code,
+      });
+    });
   });
+}
+
+async function discoverGitRoot(absPath: string): Promise<string | null> {
+  const probePath = (() => {
+    try {
+      if (fs.existsSync(absPath) && fs.statSync(absPath).isDirectory()) {
+        return absPath;
+      }
+    } catch {}
+    return path.dirname(absPath);
+  })();
+
+  const rootResult = await runGit(probePath, ["rev-parse", "--show-toplevel"]);
+  if (rootResult.code !== 0) return null;
+  const root = normalizeRepoPath(rootResult.stdout.trim());
+  if (!root) return null;
+  if (!isUnderAnyAllowedRoot(root)) return null;
+  return root;
 }
 
 function parsePorcelainStatus(output: string): Map<string, string> {
@@ -103,47 +130,74 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "files[] required" }, { status: 400 });
   }
 
-  const targets = parsed.files
-    .map((filePath) => (typeof filePath === "string" ? filePath.trim() : ""))
-    .filter(Boolean)
-    .map((filePath) => path.resolve(filePath))
-    .filter(isUnderRepoRoot)
-    .map((abs) => ({
-      abs,
-      rel: path.relative(REPO_ROOT, abs).replace(/\\/g, "/"),
-    }));
+  const byRepo = new Map<string, TargetFile[]>();
 
-  if (targets.length === 0) {
-    return NextResponse.json({ error: "No valid files under repository root" }, { status: 400 });
-  }
+  for (const rawFile of parsed.files) {
+    const trimmed = typeof rawFile === "string" ? rawFile.trim() : "";
+    if (!trimmed) continue;
+    const abs = path.resolve(trimmed);
+    if (!isUnderAnyAllowedRoot(abs)) continue;
 
-  const statusResult = await runGit(["-C", REPO_ROOT, "status", "--porcelain", "--", ...targets.map((t) => t.rel)]);
-  const statusMap = parsePorcelainStatus(statusResult.stdout);
+    const repoRoot = await discoverGitRoot(abs);
+    if (!repoRoot) continue;
 
-  const files = [] as Array<{ path: string; status: string; diff: string }>;
-  for (const target of targets) {
-    const statusRaw = statusMap.get(target.rel) ?? "";
-    const status = fs.existsSync(target.abs) ? classifyStatus(statusRaw) : "missing";
+    const rel = path.relative(repoRoot, abs).replace(/\\/g, "/");
+    if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) continue;
 
-    let diff = "";
-    if (status === "untracked" && fs.existsSync(target.abs)) {
-      const untrackedDiff = await runGit(["-C", REPO_ROOT, "diff", "--no-index", "--", "/dev/null", target.rel]);
-      diff = untrackedDiff.stdout || untrackedDiff.stderr;
-    } else if (status !== "clean" && status !== "missing") {
-      const staged = await runGit(["-C", REPO_ROOT, "diff", "--cached", "--", target.rel]);
-      const unstaged = await runGit(["-C", REPO_ROOT, "diff", "--", target.rel]);
-      diff = [staged.stdout, unstaged.stdout].filter((part) => part.trim().length > 0).join("\n");
+    const group = byRepo.get(repoRoot) ?? [];
+    if (!group.some((entry) => entry.rel === rel)) {
+      group.push({ abs, rel });
+      byRepo.set(repoRoot, group);
     }
-
-    files.push({
-      path: target.rel,
-      status,
-      diff: clampDiff(diff),
-    });
   }
+
+  if (byRepo.size === 0) {
+    return NextResponse.json({ error: "No valid files under allowed git repositories" }, { status: 400 });
+  }
+
+  const files: Array<{ path: string; relPath: string; repoRoot: string; status: string; diff: string }> = [];
+
+  const reviewPromises: Array<Promise<void>> = [];
+
+  byRepo.forEach((targets, repoRoot) => {
+    reviewPromises.push((async () => {
+      const relTargets = targets.map((target) => target.rel);
+      const statusResult = await runGit(repoRoot, ["status", "--porcelain", "--", ...relTargets]);
+      const statusMap = parsePorcelainStatus(statusResult.stdout);
+
+      for (const target of targets) {
+        const statusRaw = statusMap.get(target.rel) ?? "";
+        const status = fs.existsSync(target.abs) ? classifyStatus(statusRaw) : "missing";
+
+        let diff = "";
+        if (status === "untracked" && fs.existsSync(target.abs)) {
+          const untrackedDiff = await runGit(repoRoot, ["diff", "--no-index", "--", "/dev/null", target.rel]);
+          diff = untrackedDiff.stdout || untrackedDiff.stderr;
+        } else if (status !== "clean" && status !== "missing") {
+          const staged = await runGit(repoRoot, ["diff", "--cached", "--", target.rel]);
+          const unstaged = await runGit(repoRoot, ["diff", "--", target.rel]);
+          diff = [staged.stdout, unstaged.stdout].filter((part) => part.trim().length > 0).join("\n");
+        }
+
+        files.push({
+          path: target.abs.replace(/\\/g, "/"),
+          relPath: target.rel,
+          repoRoot,
+          status,
+          diff: clampDiff(diff),
+        });
+      }
+    })());
+  });
+
+  await Promise.all(reviewPromises);
+  files.sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+
+  const repoRoots = Array.from(byRepo.keys()).sort();
 
   return NextResponse.json({
-    repoRoot: REPO_ROOT,
+    repoRoot: repoRoots.length === 1 ? repoRoots[0] : "multiple",
+    repoRoots,
     hasChanges: files.some((file) => !["clean", "missing"].includes(file.status)),
     files,
   });
