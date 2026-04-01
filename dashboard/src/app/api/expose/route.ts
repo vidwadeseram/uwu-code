@@ -4,8 +4,6 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-const EXPOSED_PORTS_FILE = "/opt/vps-dashboard/exposed_ports.json";
-
 async function runCommand(
   cmd: string,
 ): Promise<{ stdout: string; stderr: string; success: boolean }> {
@@ -38,7 +36,9 @@ async function getPublicIp(): Promise<string> {
 }
 
 async function getUfwStatus(): Promise<string[]> {
-  const { stdout } = await runCommand("sudo ufw status | grep '^Anywhere' | awk '{print $3}' | sort -u");
+  const { stdout } = await runCommand(
+    "sudo ufw status | awk '/ALLOW/ && /tcp/ { for (i=1; i<=NF; i++) if ($i ~ /\\/tcp/) { gsub(/\\/tcp/, \"\", $i); if ($i ~ /^[0-9]+$/) print $i; } }' | sort -u"
+  );
   return stdout
     .split("\n")
     .map((l) => l.trim().split("/")[0])
@@ -124,7 +124,7 @@ export async function DELETE(req: NextRequest) {
     const publicIp = await getPublicIp();
     const url = `http://${publicIp}:${port}`;
 
-    const ufwResult = await runCommand(`sudo ufw delete allow ${port}/tcp`);
+    const ufwResult = await runCommand(`sudo ufw --force delete allow ${port}/tcp`);
 
     if (ufwResult.success) {
       return NextResponse.json({

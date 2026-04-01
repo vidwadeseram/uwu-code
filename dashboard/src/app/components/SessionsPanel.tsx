@@ -160,6 +160,7 @@ function WindowRow({
             strokeLinejoin="round"
             style={{ color: "#4a5568" }}
           >
+            <title>Working directory</title>
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
             <polyline points="9 22 9 12 15 12 15 22" />
           </svg>
@@ -287,6 +288,7 @@ function SessionCard({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Toggle session details</title>
             <polyline points="9 18 15 12 9 6" />
           </svg>
 
@@ -308,6 +310,7 @@ function SessionCard({
               strokeLinecap="round"
               strokeLinejoin="round"
             >
+              <title>Session</title>
               <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
               <line x1="8" y1="21" x2="16" y2="21" />
               <line x1="12" y1="17" x2="12" y2="21" />
@@ -341,6 +344,7 @@ function SessionCard({
                 stroke="currentColor"
                 strokeWidth="2"
               >
+                <title>Ports in session</title>
                 <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                 <circle cx="12" cy="10" r="3" />
               </svg>
@@ -420,6 +424,11 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
   const [unexposingPort, setUnexposingPort] = useState<number | null>(null);
 
   const exposedSet = useMemo(() => new Set(exposedPorts.map((p) => p.port)), [exposedPorts]);
+  const discoveredPortSet = useMemo(() => new Set(ports.map((p) => p.port)), [ports]);
+  const sortedExposedPorts = useMemo(
+    () => [...exposedPorts].sort((a, b) => a.port - b.port),
+    [exposedPorts]
+  );
 
   const fetchExposedPorts = useCallback(async () => {
     setExposedLoading(true);
@@ -438,6 +447,13 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
     void refreshToken;
     void fetchExposedPorts();
   }, [fetchExposedPorts, refreshToken]);
+
+  useEffect(() => {
+    const poll = setInterval(() => {
+      void fetchExposedPorts();
+    }, 10000);
+    return () => clearInterval(poll);
+  }, [fetchExposedPorts]);
 
   const handleUnexpose = useCallback(async (port: number) => {
     if (unexposingPort !== null) return;
@@ -479,6 +495,7 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Tmux sessions</title>
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
@@ -500,6 +517,87 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
       </div>
 
       {/* Content */}
+      <div
+        className="card p-3 space-y-2"
+        style={{ border: "1px solid rgba(0,212,255,0.25)", background: "rgba(30,45,74,0.25)" }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>
+            Exposed Ports
+          </div>
+          <span
+            className="badge"
+            style={{
+              background: "rgba(0, 212, 255, 0.1)",
+              color: "#00d4ff",
+              border: "1px solid rgba(0, 212, 255, 0.25)",
+            }}
+          >
+            {exposedLoading ? "…" : `${sortedExposedPorts.length} active`}
+          </span>
+        </div>
+
+        {sortedExposedPorts.length === 0 ? (
+          <div className="text-xs" style={{ color: "#4a5568" }}>
+            No exposed ports found.
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {sortedExposedPorts.map((item) => {
+              const matched = discoveredPortSet.has(item.port);
+              return (
+                <div
+                  key={item.port}
+                  className="flex items-center justify-between gap-2 rounded px-2 py-1.5"
+                  style={{ background: "rgba(15,23,42,0.75)", border: "1px solid #1e2d4a" }}
+                >
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="badge" style={{ background: "rgba(0,212,255,0.12)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.3)" }}>
+                      :{item.port}
+                    </span>
+                    <a
+                      href={item.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-mono truncate"
+                      style={{ color: "#94a3b8" }}
+                      title={item.url}
+                    >
+                      {item.url}
+                    </a>
+                    <span
+                      className="text-[10px] px-1.5 py-0.5 rounded"
+                      style={{
+                        background: matched ? "rgba(0,255,136,0.1)" : "rgba(255,215,0,0.1)",
+                        color: matched ? "#00ff88" : "#ffd700",
+                        border: `1px solid ${matched ? "rgba(0,255,136,0.25)" : "rgba(255,215,0,0.25)"}`,
+                      }}
+                      title={matched ? "Detected in listening ports" : "Not currently detected in listening ports"}
+                    >
+                      {matched ? "listening" : "rule only"}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="px-2 py-0.5 rounded text-[10px] font-semibold"
+                    onClick={() => void handleUnexpose(item.port)}
+                    disabled={unexposingPort === item.port}
+                    style={{
+                      background: "rgba(255,68,68,0.12)",
+                      color: unexposingPort === item.port ? "#4a5568" : "#ff6b6b",
+                      border: "1px solid rgba(255,68,68,0.3)",
+                    }}
+                  >
+                    {unexposingPort === item.port ? "Stopping…" : "Stop"}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2].map((i) => (
@@ -535,6 +633,7 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>No sessions</title>
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
@@ -552,7 +651,7 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
         </div>
       ) : (
         <div className="space-y-3">
-          {sessions.map((session, i) => (
+          {sessions.map((session) => (
             <SessionCard
               key={session.name}
               session={session}
