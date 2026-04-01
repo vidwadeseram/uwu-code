@@ -143,12 +143,26 @@ function responseIssue(
     if (!testFile) {
       return "Discoverer response missing saved tests path while tests persistence is enabled.";
     }
+    if (!fs.existsSync(testFile)) {
+      return `Saved tests file does not exist on disk: ${testFile}`;
+    }
   }
 
   if (expected.persistDocs) {
     const docsFile = typeof persisted.knowledgeFile === "string" ? persisted.knowledgeFile.trim() : "";
     if (!docsFile) {
       return "Discoverer response missing saved docs path while docs persistence is enabled.";
+    }
+    if (!fs.existsSync(docsFile)) {
+      return `Saved docs file does not exist on disk: ${docsFile}`;
+    }
+    try {
+      const stat = fs.statSync(docsFile);
+      if (!stat.isFile()) {
+        return `Saved docs path is not a file: ${docsFile}`;
+      }
+    } catch {
+      return `Saved docs file is not readable: ${docsFile}`;
     }
   }
 
@@ -205,6 +219,7 @@ function buildApiPayload(input: {
   project: string;
   persistTests: boolean;
   persistDocs: boolean;
+  generationTarget: "api" | "claude" | "opencode";
   testSavePath?: string;
   docsSavePath?: string;
 }) {
@@ -213,6 +228,7 @@ function buildApiPayload(input: {
     project: input.project,
     persistTests: input.persistTests,
     persistDocs: input.persistDocs,
+    generationTarget: input.generationTarget,
   };
   if (input.testSavePath) payload.testSavePath = input.testSavePath;
   if (input.docsSavePath) payload.docsSavePath = input.docsSavePath;
@@ -227,15 +243,6 @@ function buildCurlCommand(payload: string): string {
   return `curl -sSf -X POST http://127.0.0.1:${port}/api/discoverer ${headers.join(" ")} -d ${shellQuote(payload)}`;
 }
 
-function buildAgentPrompt(curlCmd: string, input: { project: string; workspacePath: string }) {
-  return [
-    `You are running Discoverer for project ${input.project}.`,
-    `Workspace path: ${input.workspacePath}.`,
-    "Run this exact bash command once and output only the JSON response:",
-    curlCmd,
-  ].join("\n");
-}
-
 function buildRunnerCommand(target: DiscoverTarget, input: {
   workspacePath: string;
   project: string;
@@ -244,29 +251,12 @@ function buildRunnerCommand(target: DiscoverTarget, input: {
   testSavePath?: string;
   docsSavePath?: string;
 }) {
-  const payload = buildApiPayload(input);
+  const payload = buildApiPayload({
+    ...input,
+    generationTarget: target,
+  });
   const curlCmd = buildCurlCommand(payload);
-
-  if (target === "api") {
-    return curlCmd;
-  }
-
-  const prompt = buildAgentPrompt(curlCmd, input);
-  if (target === "claude") {
-    const claudeCmd = `cd /home/uwu && claude --dangerously-skip-permissions -p ${shellQuote(prompt)}`;
-    return `(${claudeCmd}) 1>&2 || true; ${curlCmd}`;
-  }
-
-  const opencodeLookup = [
-    "OPENCODE_BIN=\"$(command -v opencode || true)\"",
-    "[ -z \"$OPENCODE_BIN\" ] && [ -x /usr/local/bin/opencode ] && OPENCODE_BIN=/usr/local/bin/opencode",
-    "[ -z \"$OPENCODE_BIN\" ] && [ -x /opt/homebrew/bin/opencode ] && OPENCODE_BIN=/opt/homebrew/bin/opencode",
-    "[ -z \"$OPENCODE_BIN\" ] && [ -x /home/uwu/.local/bin/opencode ] && OPENCODE_BIN=/home/uwu/.local/bin/opencode",
-  ].join("; ");
-
-  const runWithOpencode = `if [ -z \"$OPENCODE_BIN\" ]; then echo \"opencode binary not found\" >&2; else cd ${shellQuote(REGRESSION_DIR)} && \"$OPENCODE_BIN\" run --dir ${shellQuote(REGRESSION_DIR)} ${shellQuote(prompt)}; fi`;
-
-  return `${opencodeLookup}; (${runWithOpencode}) 1>&2 || true; ${curlCmd}`;
+  return curlCmd;
 }
 
 function spawnBackgroundRun(meta: DiscoverRun) {

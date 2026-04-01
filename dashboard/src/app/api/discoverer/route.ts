@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { execFile } from "child_process";
 import {
   allowedWorkspaceRoots,
   buildAgentDocs,
@@ -30,6 +31,7 @@ interface DiscovererRequest {
   persistDocs?: boolean;
   testSavePath?: string;
   docsSavePath?: string;
+  generationTarget?: "api" | "claude" | "opencode";
 }
 
 interface DiscovererAiOutput {
@@ -37,6 +39,12 @@ interface DiscovererAiOutput {
   test_cases: DiscovererCase[];
   workflows: DiscovererWorkflow[];
   agent_docs: string;
+}
+
+interface CliRunResult {
+  stdout: string;
+  stderr: string;
+  code: number;
 }
 
 function normalizeForCompare(input: string): string {
@@ -259,6 +267,131 @@ async function generateWithModel(project: string, context: ReturnType<typeof col
   };
 }
 
+function runCli(file: string, args: string[], cwd: string): Promise<CliRunResult> {
+  return new Promise((resolve) => {
+    execFile(
+      file,
+      args,
+      {
+        cwd,
+        env: {
+          ...process.env,
+          HOME: process.env.HOME || "/home/uwu",
+          PATH: `${process.env.PATH ?? ""}:/usr/local/bin:/opt/homebrew/bin:/home/uwu/.local/bin`,
+        },
+        maxBuffer: 20 * 1024 * 1024,
+        timeout: 180_000,
+      },
+      (error, stdout, stderr) => {
+        let code = 0;
+        if (error) {
+          const rawCode = (error as NodeJS.ErrnoException).code;
+          if (typeof rawCode === "number") {
+            code = rawCode;
+          } else if (typeof rawCode === "string") {
+            const parsedCode = Number(rawCode);
+            code = Number.isFinite(parsedCode) ? parsedCode : 1;
+          } else {
+            code = 1;
+          }
+        }
+        resolve({
+          stdout: stdout ?? "",
+          stderr: stderr ?? "",
+          code,
+        });
+      }
+    );
+  });
+}
+
+function resolveCommandCandidates(target: "claude" | "opencode"): string[] {
+  if (target === "claude") {
+    return [
+      process.env.CLAUDE_BIN?.trim() ?? "",
+      "claude",
+      "/usr/local/bin/claude",
+      "/opt/homebrew/bin/claude",
+      "/home/uwu/.local/bin/claude",
+    ].filter(Boolean);
+  }
+  return [
+    process.env.OPENCODE_BIN?.trim() ?? "",
+    "opencode",
+    "/usr/local/bin/opencode",
+    "/opt/homebrew/bin/opencode",
+    "/home/uwu/.local/bin/opencode",
+  ].filter(Boolean);
+}
+
+function discovererCliPrompt(context: ReturnType<typeof collectWorkspaceContext>): string {
+  return [
+    "You are Discoverer. Generate realistic, workspace-specific QA artifacts.",
+    "Return strictly valid JSON with this exact shape:",
+    "{",
+    '  "description": string,',
+    '  "test_cases": [{ "id": string, "label": string, "task": string, "enabled": boolean, "depends_on": string|null, "skip_dependents_on_fail": boolean }],',
+    '  "workflows": [{ "id": string, "label": string, "description": string, "enabled": boolean, "case_ids": string[] }],',
+    '  "agent_docs": string',
+    "}",
+    "Rules:",
+    "- Make test cases specific to discovered routes, scripts, and architecture.",
+    "- Use placeholders like {{BASE_URL}}, {{LOGIN_ID}}, {{PASSWORD}} only when required.",
+    "- Do not output markdown fences. Output JSON only.",
+    "- case_ids in workflows must reference generated test case ids.",
+    "Workspace context:",
+    JSON.stringify(compactWorkspaceContext(context), null, 2),
+  ].join("\n");
+}
+
+async function generateWithCli(
+  target: "claude" | "opencode",
+  project: string,
+  context: ReturnType<typeof collectWorkspaceContext>
+): Promise<{ testConfig: DiscovererTestConfig; agentDocs: string; model: string }> {
+  const prompt = discovererCliPrompt(context);
+  const candidates = resolveCommandCandidates(target);
+  const cwd = target === "claude" ? "/home/uwu" : REGRESSION_DIR;
+
+  let lastError = "";
+  for (const command of candidates) {
+    const args = target === "claude"
+      ? ["--dangerously-skip-permissions", "-p", prompt]
+      : ["run", "--dir", context.workspacePath, prompt];
+
+    const result = await runCli(command, args, cwd);
+    const raw = [result.stdout, result.stderr]
+      .map((v) => v.trim())
+      .filter((v) => v.length > 0)
+      .join("\n");
+
+    if (result.code !== 0) {
+      lastError = `${target} command '${command}' failed (${result.code}): ${raw || "no output"}`;
+      continue;
+    }
+
+    try {
+      const parsed = extractJsonPayload(raw);
+      const normalized = normalizeAiOutput(project, parsed);
+      return {
+        testConfig: {
+          project,
+          description: normalized.description,
+          test_cases: normalized.test_cases,
+          workflows: normalized.workflows,
+        },
+        agentDocs: normalized.agent_docs,
+        model: `cli/${target}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      lastError = `${target} command '${command}' produced invalid JSON output: ${message}`;
+    }
+  }
+
+  throw new Error(lastError || `${target} CLI generation failed`);
+}
+
 export async function POST(req: NextRequest) {
   let body: unknown;
   try {
@@ -316,8 +449,13 @@ export async function POST(req: NextRequest) {
   const persistDocs = parsed.persistDocs !== false;
   const testSavePath = (parsed.testSavePath ?? "").trim();
   const docsSavePath = (parsed.docsSavePath ?? "").trim();
+  const generationTarget = parsed.generationTarget ?? "api";
   const resolvedTestSavePath = resolvePersistPath(testSavePath, normalizedWorkspace);
   const resolvedDocsSavePath = resolvePersistPath(docsSavePath, normalizedWorkspace);
+
+  if (generationTarget !== "api" && generationTarget !== "claude" && generationTarget !== "opencode") {
+    return NextResponse.json({ error: "generationTarget must be api|claude|opencode" }, { status: 400 });
+  }
 
   if (testSavePath && !resolvedTestSavePath) {
     return NextResponse.json(
@@ -341,7 +479,9 @@ export async function POST(req: NextRequest) {
   let generationWarning = "";
 
   try {
-    const generated = await generateWithModel(project, context);
+    const generated = generationTarget === "api"
+      ? await generateWithModel(project, context)
+      : await generateWithCli(generationTarget, project, context);
     generatedTestConfig = generated.testConfig;
     agentDocs = generated.agentDocs;
     generationModel = generated.model;
