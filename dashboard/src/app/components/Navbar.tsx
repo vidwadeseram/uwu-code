@@ -136,7 +136,7 @@ export default function Navbar() {
               </svg>
             </div>
             <span className="font-bold text-sm tracking-wider hidden sm:block" style={{ color: "#00ff88" }}>
-              VPS<span style={{ color: "#00d4ff" }}>DEV</span>
+              UWU<span style={{ color: "#00d4ff" }}>CODE</span>
             </span>
           </Link>
 
