@@ -21,6 +21,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, field
@@ -217,6 +218,69 @@ def _normalize_phone(phone: str) -> str:
     return phone
 
 
+def _is_otp_step(url: str, html: str) -> bool:
+    lowered = f"{url} {html}".lower()
+    return (
+        "otp" in lowered
+        or "verification" in lowered
+        or "verify your" in lowered
+        or "verification code" in lowered
+    )
+
+
+def _extract_latest_otp(text: str) -> str:
+    patterns = [
+        r"(?:otp|verification code|one[- ]?time password|code)\D{0,20}(\d{4,8})",
+        r"\b(\d{6})\b",
+        r"\b(\d{4})\b",
+    ]
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    for line in reversed(lines):
+        lowered = line.lower()
+        if "otp" not in lowered and "verification" not in lowered and "code" not in lowered:
+            continue
+        for pattern in patterns:
+            found = re.findall(pattern, line, flags=re.IGNORECASE)
+            if found:
+                return found[-1]
+
+    whole = "\n".join(lines[-200:])
+    for pattern in patterns:
+        found = re.findall(pattern, whole, flags=re.IGNORECASE)
+        if found:
+            return found[-1]
+    return ""
+
+
+def _read_otp_from_tmux(env: dict[str, str]) -> tuple[str, str]:
+    session = env.get("OTP_TMUX_SESSION", "allinonepos").strip() or "allinonepos"
+    window = env.get("OTP_TMUX_WINDOW", "pos-commons").strip()
+    lines = env.get("OTP_TMUX_CAPTURE_LINES", "800").strip()
+    line_count = lines if lines.isdigit() else "800"
+
+    targets = [f"{session}:{window}"] if window else []
+    targets.append(session)
+
+    for target in targets:
+        try:
+            capture = subprocess.run(
+                ["tmux", "capture-pane", "-pt", target, "-S", f"-{line_count}"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+        except Exception:
+            continue
+
+        output = (capture.stdout or "") + "\n" + (capture.stderr or "")
+        otp = _extract_latest_otp(output)
+        if otp:
+            return otp, target
+
+    return "", session if not window else f"{session}:{window}"
+
+
 async def run_case_scripted(
     case: dict,
     env: dict[str, str],
@@ -305,6 +369,48 @@ async def run_case_scripted(
             return False, last_detail
 
         async def do_admin_login() -> tuple[bool, str]:
+            async def solve_admin_otp() -> tuple[bool, str]:
+                otp, source = _read_otp_from_tmux(env)
+                if not otp:
+                    return False, f"OTP challenge detected but no OTP found from tmux target {source}"
+
+                filled = await _fill_first(
+                    page,
+                    [
+                        "input[name*='otp' i]",
+                        "input[placeholder*='otp' i]",
+                        "input[name*='verification' i]",
+                        "input[placeholder*='verification' i]",
+                    ],
+                    otp,
+                )
+
+                if not filled:
+                    try:
+                        candidates = page.locator("input[type='text'], input[type='tel'], input[type='number']")
+                        count = await candidates.count()
+                        if count >= len(otp):
+                            for idx, digit in enumerate(otp):
+                                await candidates.nth(idx).fill(digit, timeout=1200)
+                            filled = True
+                    except Exception:
+                        filled = False
+
+                if not filled:
+                    return False, f"OTP found from {source} but OTP inputs were not fillable"
+
+                clicked = await _click_by_names(page, ["verify", "submit", "continue", "confirm"])
+                await page.wait_for_timeout(3500)
+                visible_after = await _get_visible_text(page)
+                auth_error = _has_auth_error(visible_after)
+                still_otp = _is_otp_step(page.url, visible_after)
+                if clicked and not auth_error and not still_otp:
+                    return True, f"SUCCESS_OTP via tmux {source}"
+                return False, (
+                    f"OTP submit did not complete auth flow (clicked={bool(clicked)} auth_error={auth_error} "
+                    f"still_otp={still_otp} source={source})"
+                )
+
             await page.goto(admin_url, wait_until="domcontentloaded", timeout=45000)
             await page.wait_for_timeout(1200)
             last_detail = "admin_login failed"
@@ -340,6 +446,14 @@ async def run_case_scripted(
                 visible_text = await _get_visible_text(page)
                 auth_error = _has_auth_error(visible_text)
                 moved_from_login = "login" not in page.url.lower()
+                otp_gate = _is_otp_step(page.url, visible_text)
+                if user_filled and pass_filled and clicked and otp_gate:
+                    solved, otp_detail = await solve_admin_otp()
+                    if solved:
+                        return True, otp_detail
+                    last_detail = otp_detail
+                    continue
+
                 ok = user_filled and pass_filled and clicked and (moved_from_login or not auth_error)
                 if ok:
                     return True, "SUCCESS"
