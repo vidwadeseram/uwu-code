@@ -2,13 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
+import { getProjectPaths, getReadableProjectPaths } from "@/app/lib/tests-paths";
 
 const REGRESSION_DIR = path.join(process.cwd(), "..", "regression_tests");
-const RESULTS_DIR = path.join(REGRESSION_DIR, "results");
-const TEST_CASES_DIR = path.join(REGRESSION_DIR, "test_cases");
 
 function loadProjectEnv(project: string): Record<string, string> {
-  const envFile = path.join(TEST_CASES_DIR, `${project}.env.json`);
+  const envFile = getReadableProjectPaths(project).envFile;
   try {
     return fs.existsSync(envFile) ? JSON.parse(fs.readFileSync(envFile, "utf-8")) : {};
   } catch {
@@ -35,7 +34,7 @@ function findUv(): string {
 }
 
 function runningFile(project: string) {
-  return path.join(RESULTS_DIR, project, "running.json");
+  return path.join(getReadableProjectPaths(project).projectResultsDir, "running.json");
 }
 
 function parseSelection(value: unknown): string[] {
@@ -91,7 +90,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Ensure results dir exists
-  const projectResultsDir = path.join(RESULTS_DIR, project);
+  const projectPaths = getProjectPaths(project);
+  const projectResultsDir = projectPaths.projectResultsDir;
   fs.mkdirSync(projectResultsDir, { recursive: true });
 
   const runId = new Date().toISOString().replace(/[:.]/g, "").replace("Z", "Z");
@@ -122,12 +122,14 @@ export async function POST(req: NextRequest) {
     cwd: REGRESSION_DIR,
     detached: true,
     stdio: ["ignore", logFd, logFd],
-    env: {
-      ...process.env,
-      ...projectEnv,
-      PATH: `${process.env.PATH}:/usr/local/bin:/root/.local/bin:/root/.cargo/bin`,
-    },
-  });
+      env: {
+        ...process.env,
+        ...projectEnv,
+        UWU_TEST_CASES_DIR: projectPaths.testCasesDir,
+        UWU_RESULTS_DIR: projectPaths.resultsDir,
+        PATH: `${process.env.PATH}:/usr/local/bin:/root/.local/bin:/root/.cargo/bin`,
+      },
+    });
 
   // Write lock file with PID so we can verify process is still alive later
   fs.writeFileSync(

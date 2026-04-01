@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { getReadableProjectPaths } from "@/app/lib/tests-paths";
 
 const RESULTS_DIR = path.join(process.cwd(), "..", "regression_tests", "results");
+
+function resolveRecordingPath(file: string): string {
+  const project = file.split("/")[0] ?? "";
+  if (/^[a-zA-Z0-9_-]+$/.test(project)) {
+    const projectPath = path.join(getReadableProjectPaths(project).resultsDir, file);
+    if (fs.existsSync(projectPath)) return projectPath;
+  }
+  return path.join(RESULTS_DIR, file);
+}
 
 /**
  * GET /api/tests/recordings?file=slug/recordings/run_id/case_id/video.webm
@@ -17,9 +27,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid file path" }, { status: 400 });
   }
 
-  const filePath = path.join(RESULTS_DIR, file);
+  const filePath = resolveRecordingPath(file);
 
-  if (!filePath.startsWith(RESULTS_DIR)) {
+  const project = file.split("/")[0] ?? "";
+  const projectRoot = /^[a-zA-Z0-9_-]+$/.test(project) ? getReadableProjectPaths(project).resultsDir : RESULTS_DIR;
+  const allowedRoots = [RESULTS_DIR, projectRoot]
+    .map((root) => path.resolve(root));
+  const resolvedFilePath = path.resolve(filePath);
+  if (!allowedRoots.some((root) => resolvedFilePath.startsWith(root + path.sep) || resolvedFilePath === root)) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
 

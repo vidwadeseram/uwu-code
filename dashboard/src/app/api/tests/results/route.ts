@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-
-const REGRESSION_DIR = path.join(process.cwd(), "..", "regression_tests");
-const RESULTS_DIR = path.join(REGRESSION_DIR, "results");
+import { getProjectPaths, getReadableProjectPaths } from "@/app/lib/tests-paths";
 
 interface CaseResult {
   id: string;
@@ -47,7 +45,7 @@ function parseStringArray(value: unknown): string[] {
     .filter((item) => item.length > 0);
 }
 
-function asRunResult(value: unknown, defaultProject: string): RunResult | null {
+function asRunResult(value: unknown, defaultProject: string, resultsDir: string): RunResult | null {
   if (!value || typeof value !== "object") return null;
   const row = value as Record<string, unknown>;
   if (typeof row.run_id !== "string" || typeof row.started_at !== "string") return null;
@@ -59,7 +57,7 @@ function asRunResult(value: unknown, defaultProject: string): RunResult | null {
       ...item,
       recording:
         typeof item.recording === "string"
-          ? normalizeRecordingPath(item.recording)
+          ? normalizeRecordingPath(item.recording, resultsDir)
           : item.recording ?? undefined,
     }));
 
@@ -106,10 +104,10 @@ function stripAnsi(input: string): string {
   return input.replace(new RegExp("\\u001B\\[[0-9;]*[A-Za-z]", "g"), "");
 }
 
-function readLogText(meta: AgentRunMeta): string {
+function readLogText(meta: AgentRunMeta, resultsDir: string): string {
   if (!meta.log_file) return "";
   try {
-    const abs = path.join(RESULTS_DIR, meta.log_file);
+    const abs = path.join(resultsDir, meta.log_file);
     if (!fs.existsSync(abs)) return "";
     return fs.readFileSync(abs, "utf-8");
   } catch {
@@ -117,7 +115,7 @@ function readLogText(meta: AgentRunMeta): string {
   }
 }
 
-function normalizeRecordingPath(value: string | undefined): string | undefined {
+function normalizeRecordingPath(value: string | undefined, resultsDir: string): string | undefined {
   if (!value) return undefined;
   const raw = value.trim().replace(/^`|`$/g, "");
   if (!raw) return undefined;
@@ -125,7 +123,7 @@ function normalizeRecordingPath(value: string | undefined): string | undefined {
   const normalized = raw.replace(/\\/g, "/").replace(/\/+/g, "/");
   if (normalized.includes("..") || normalized.includes("\0")) return undefined;
 
-  const resultsPrefix = RESULTS_DIR.replace(/\\/g, "/") + "/";
+  const resultsPrefix = resultsDir.replace(/\\/g, "/") + "/";
   if (normalized.startsWith(resultsPrefix)) {
     const rel = normalized.slice(resultsPrefix.length);
     return rel.startsWith("/") || rel.includes("..") ? undefined : rel;
@@ -155,8 +153,8 @@ function parseStatus(token: string): { passed: boolean; skipped: boolean } {
   return { passed: false, skipped: false };
 }
 
-function parseCaseResultsFromAgentText(meta: AgentRunMeta): CaseResult[] {
-  const chunks = [meta.summary ?? "", readLogText(meta)].filter((value) => value.length > 0);
+function parseCaseResultsFromAgentText(meta: AgentRunMeta, resultsDir: string): CaseResult[] {
+  const chunks = [meta.summary ?? "", readLogText(meta, resultsDir)].filter((value) => value.length > 0);
   if (chunks.length === 0) return [];
 
   const source = stripAnsi(chunks.join("\n")).slice(-50000);
@@ -166,7 +164,7 @@ function parseCaseResultsFromAgentText(meta: AgentRunMeta): CaseResult[] {
   while (match !== null) {
     const caseId = match[1];
     const status = parseStatus(match[2]);
-    const recording = normalizeRecordingPath(match[3]);
+    const recording = normalizeRecordingPath(match[3], resultsDir);
 
     byCase.set(caseId, {
       id: `${meta.run_id}-${caseId}-report`,
@@ -242,10 +240,10 @@ function listVideoFilesRecursive(rootDir: string): string[] {
   return files.sort();
 }
 
-function toRecordingCaseResults(meta: AgentRunMeta, detail: string): CaseResult[] {
+function toRecordingCaseResults(meta: AgentRunMeta, detail: string, resultsDir: string): CaseResult[] {
   const roots = [
-    path.join(RESULTS_DIR, meta.project, "recordings", "manual", meta.run_id),
-    path.join(RESULTS_DIR, meta.project, "agent_runs", "manual", meta.run_id),
+    path.join(resultsDir, meta.project, "recordings", "manual", meta.run_id),
+    path.join(resultsDir, meta.project, "agent_runs", "manual", meta.run_id),
   ];
 
   const seen = new Set<string>();
@@ -255,7 +253,7 @@ function toRecordingCaseResults(meta: AgentRunMeta, detail: string): CaseResult[
     if (!fs.existsSync(root)) continue;
 
     for (const abs of listVideoFilesRecursive(root)) {
-      const rel = path.relative(RESULTS_DIR, abs);
+      const rel = path.relative(resultsDir, abs);
       if (rel.startsWith("..")) continue;
 
       const relPosix = rel.split(path.sep).join("/");
@@ -290,7 +288,7 @@ function toCasePlaceholderResults(meta: AgentRunMeta, detail: string): CaseResul
   }));
 }
 
-function toFallbackRun(meta: AgentRunMeta): RunResult {
+function toFallbackRun(meta: AgentRunMeta, resultsDir: string): RunResult {
   const failed = meta.status === "failed";
   const failureSummary = failed ? summarizeFailure(meta.summary) : "";
   const failureDetail =
@@ -310,8 +308,8 @@ function toFallbackRun(meta: AgentRunMeta): RunResult {
       ? "Case was selected, but no structured result or recording was found before the run failed."
       : "Case was selected, but no structured result or recording was found for this run.";
 
-  const recordingCases = toRecordingCaseResults(meta, recordingDetail);
-  const reportCases = parseCaseResultsFromAgentText(meta);
+  const recordingCases = toRecordingCaseResults(meta, recordingDetail, resultsDir);
+  const reportCases = parseCaseResultsFromAgentText(meta, resultsDir);
 
   if (reportCases.length > 0) {
     const recordingByCase = new Map<string, string>();
@@ -445,7 +443,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid project name" }, { status: 400 });
   }
 
-  const projectResultsDir = path.join(RESULTS_DIR, project);
+  const projectPaths = getReadableProjectPaths(project);
+  const projectResultsDir = projectPaths.projectResultsDir;
   if (!fs.existsSync(projectResultsDir)) {
     return NextResponse.json({ results: [] });
   }
@@ -462,7 +461,7 @@ export async function GET(req: NextRequest) {
   for (const file of files) {
     try {
       const content = JSON.parse(fs.readFileSync(path.join(projectResultsDir, file), "utf-8"));
-      const parsed = asRunResult(content, project);
+      const parsed = asRunResult(content, project, projectPaths.resultsDir);
       if (!parsed) continue;
       pushRunIfNew(results, runIds, parsed);
     } catch {
@@ -481,15 +480,19 @@ export async function GET(req: NextRequest) {
       try {
         const content = JSON.parse(fs.readFileSync(path.join(agentRunsDir, file), "utf-8"));
 
-        const parsedRun = asRunResult(content, project);
+        const parsedRun = asRunResult(content, project, projectPaths.resultsDir);
         if (parsedRun) {
+          parsedRun.results = parsedRun.results.map((item) => ({
+            ...item,
+            recording: typeof item.recording === "string" ? normalizeRecordingPath(item.recording, projectPaths.resultsDir) : item.recording,
+          }));
           pushRunIfNew(results, runIds, parsedRun);
           continue;
         }
 
         const parsedMeta = asAgentRunMeta(content);
         if (!parsedMeta || parsedMeta.status === "running") continue;
-        pushRunIfNew(results, runIds, toFallbackRun(parsedMeta));
+        pushRunIfNew(results, runIds, toFallbackRun(parsedMeta, projectPaths.resultsDir));
       } catch {
       }
     }

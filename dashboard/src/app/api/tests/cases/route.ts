@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
-import path from "path";
 import { resolveWorkspacePath } from "@/app/lib/discoverer";
-
-const REGRESSION_DIR = path.join(process.cwd(), "..", "regression_tests");
-const TEST_CASES_DIR = path.join(REGRESSION_DIR, "test_cases");
+import { getDefaultPaths, getProjectPaths, getReadableProjectPaths, listKnownProjects, setProjectWorkspace } from "@/app/lib/tests-paths";
 
 function ensureTestCasesDir() {
-  if (!fs.existsSync(TEST_CASES_DIR)) {
-    fs.mkdirSync(TEST_CASES_DIR, { recursive: true });
+  const defaultPaths = getDefaultPaths("__bootstrap__");
+  if (!fs.existsSync(defaultPaths.testCasesDir)) {
+    fs.mkdirSync(defaultPaths.testCasesDir, { recursive: true });
   }
 }
 
@@ -21,19 +19,15 @@ export async function GET(req: NextRequest) {
   ensureTestCasesDir();
 
   if (!project) {
-    // Return list of available slugs
-    const files = fs.existsSync(TEST_CASES_DIR)
-      ? fs.readdirSync(TEST_CASES_DIR).filter((f) => /^[a-zA-Z0-9_-]+\.json$/.test(f))
-      : [];
-    const slugs = files.map((f) => f.replace(/\.json$/, ""));
-    return NextResponse.json({ projects: slugs });
+    return NextResponse.json({ projects: listKnownProjects() });
   }
 
   if (!/^[a-zA-Z0-9_-]+$/.test(project)) {
     return NextResponse.json({ error: "Invalid project name" }, { status: 400 });
   }
 
-  const file = path.join(TEST_CASES_DIR, `${project}.json`);
+  const paths = getReadableProjectPaths(project);
+  const file = paths.configFile;
   const exists = fs.existsSync(file);
   if (!exists) {
     return NextResponse.json(
@@ -80,6 +74,7 @@ export async function PUT(req: NextRequest) {
 
   const asRecord = body as Record<string, unknown>;
   const providedWorkspace = typeof asRecord.workspace_path === "string" ? asRecord.workspace_path : "";
+  let resolvedWorkspace = "";
   if (providedWorkspace) {
     const resolved = resolveWorkspacePath(providedWorkspace);
     if (!resolved) {
@@ -89,9 +84,15 @@ export async function PUT(req: NextRequest) {
       );
     }
     asRecord.workspace_path = resolved;
+    resolvedWorkspace = resolved;
   }
 
-  const file = path.join(TEST_CASES_DIR, `${project}.json`);
+  if (resolvedWorkspace) {
+    setProjectWorkspace(project, resolvedWorkspace);
+  }
+
+  const paths = getProjectPaths(project);
+  const file = paths.configFile;
 
   if (createMode && fs.existsSync(file)) {
     try {
@@ -135,9 +136,11 @@ export async function DELETE(req: NextRequest) {
 
   ensureTestCasesDir();
 
-  const configFile = path.join(TEST_CASES_DIR, `${project}.json`);
-  const envFile = path.join(TEST_CASES_DIR, `${project}.env.json`);
-  const resultsDir = path.join(REGRESSION_DIR, "results", project);
+  const paths = getProjectPaths(project);
+  const defaults = getDefaultPaths(project);
+  const configFile = paths.configFile;
+  const envFile = paths.envFile;
+  const resultsDir = paths.projectResultsDir;
 
   const removed: string[] = [];
   const maybeRemove = (target: string, kind: "file" | "dir") => {
@@ -150,6 +153,14 @@ export async function DELETE(req: NextRequest) {
   maybeRemove(configFile, "file");
   maybeRemove(envFile, "file");
   maybeRemove(resultsDir, "dir");
+
+  if (defaults.configFile !== configFile) {
+    maybeRemove(defaults.configFile, "file");
+    maybeRemove(defaults.envFile, "file");
+    maybeRemove(defaults.projectResultsDir, "dir");
+  }
+
+  setProjectWorkspace(project, undefined);
 
   return NextResponse.json({ success: true, removed });
 }

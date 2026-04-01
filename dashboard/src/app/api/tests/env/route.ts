@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
-
-const TEST_CASES_DIR = path.join(process.cwd(), "..", "regression_tests", "test_cases");
+import { getProjectPaths, getReadableProjectPaths } from "@/app/lib/tests-paths";
 
 function envFile(project: string) {
-  return path.join(TEST_CASES_DIR, `${project}.env.json`);
+  return getReadableProjectPaths(project).envFile;
 }
 
 /** GET /api/tests/env?project=slug — return stored env vars */
@@ -31,7 +30,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid project" }, { status: 400 });
 
   const body = await req.json();
-  if (!fs.existsSync(TEST_CASES_DIR)) fs.mkdirSync(TEST_CASES_DIR, { recursive: true });
-  fs.writeFileSync(envFile(project), JSON.stringify(body, null, 2));
+  const target = getProjectPaths(project).envFile;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify(body, null, 2));
   return NextResponse.json({ success: true });
 }

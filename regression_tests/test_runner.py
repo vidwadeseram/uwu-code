@@ -37,8 +37,8 @@ from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 
 BASE_DIR = Path(__file__).parent
-TEST_CASES_DIR = BASE_DIR / "test_cases"
-RESULTS_DIR = BASE_DIR / "results"
+TEST_CASES_DIR = Path(os.getenv("UWU_TEST_CASES_DIR") or (BASE_DIR / "test_cases"))
+RESULTS_DIR = Path(os.getenv("UWU_RESULTS_DIR") or (BASE_DIR / "results"))
 
 
 _JSON_RECOVERY_PATCHED = False

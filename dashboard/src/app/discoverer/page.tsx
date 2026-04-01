@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import FolderTreePicker from "../components/FolderTreePicker";
+
+type DiscoverTarget = "api" | "claude" | "opencode";
+type DiscoverRunStatus = "running" | "completed" | "failed";
 
 interface DiscovererCase {
   id: string;
@@ -74,6 +77,22 @@ interface CommitResponse {
   files: string[];
 }
 
+interface DiscoverRun {
+  run_id: string;
+  target: DiscoverTarget;
+  project: string;
+  workspacePath: string;
+  persistTests: boolean;
+  persistDocs: boolean;
+  status: DiscoverRunStatus;
+  started_at: string;
+  completed_at?: string;
+  pid: number;
+  exit_code?: number;
+  summary?: string;
+  response?: unknown;
+}
+
 function toSlug(value: string): string {
   return value
     .toLowerCase()
@@ -103,6 +122,37 @@ function statusColor(status: string): string {
   }
 }
 
+function targetColor(target: DiscoverTarget): string {
+  switch (target) {
+    case "api":
+      return "#00ff88";
+    case "claude":
+      return "#f97316";
+    case "opencode":
+      return "#a855f7";
+    default:
+      return "#94a3b8";
+  }
+}
+
+function formatTime(iso: string): string {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  return new Date(t).toLocaleString();
+}
+
+function isDiscovererResponse(value: unknown): value is DiscovererResponse {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  if (typeof row.project !== "string") return false;
+  if (typeof row.workspacePath !== "string") return false;
+  if (!row.testConfig || typeof row.testConfig !== "object") return false;
+  if (typeof row.agentDocs !== "string") return false;
+  if (!row.context || typeof row.context !== "object") return false;
+  if (!row.persisted || typeof row.persisted !== "object") return false;
+  return true;
+}
+
 export default function DiscovererPage() {
   const [workspacePath, setWorkspacePath] = useState("");
   const [project, setProject] = useState("");
@@ -111,6 +161,15 @@ export default function DiscovererPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<DiscovererResponse | null>(null);
+  const [discoverRuns, setDiscoverRuns] = useState<DiscoverRun[]>([]);
+  const [dismissedRunIds, setDismissedRunIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("dismissedDiscovererRunIds") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+  const runStatusRef = useRef<Record<string, DiscoverRunStatus>>({});
 
   const [review, setReview] = useState<ReviewResponse | null>(null);
   const [reviewLoading, setReviewLoading] = useState(false);
@@ -135,6 +194,18 @@ export default function DiscovererPage() {
 
   const canRun = workspacePath.trim().length > 0 && project.trim().length > 0 && !loading;
   const testCaseCount = useMemo(() => result?.testConfig.test_cases.length ?? 0, [result]);
+  const visibleRuns = useMemo(
+    () => discoverRuns.filter((run) => !dismissedRunIds.includes(run.run_id)),
+    [discoverRuns, dismissedRunIds]
+  );
+  const runningRuns = useMemo(
+    () => visibleRuns.filter((run) => run.status === "running"),
+    [visibleRuns]
+  );
+  const recentFinishedRuns = useMemo(
+    () => visibleRuns.filter((run) => run.status !== "running").slice(0, 3),
+    [visibleRuns]
+  );
 
   const handleWorkspaceSelect = useCallback((path: string) => {
     setWorkspacePath(path);
@@ -142,39 +213,93 @@ export default function DiscovererPage() {
     if (inferred) setProject((prev) => prev || inferred);
   }, []);
 
-  const runDiscoverer = useCallback(async () => {
+  const loadDiscoverRuns = useCallback(async (slug: string) => {
+    const res = await fetch(`/api/discoverer/agent-run?project=${encodeURIComponent(slug)}`);
+    if (!res.ok) return;
+    const data = await res.json() as { runs?: DiscoverRun[] };
+    const nextRuns = data.runs ?? [];
+
+    const prevStatuses = runStatusRef.current;
+    const nextStatuses: Record<string, DiscoverRunStatus> = {};
+    let completedWithResponse: DiscoverRun | null = null;
+
+    for (const run of nextRuns) {
+      nextStatuses[run.run_id] = run.status;
+      if (
+        prevStatuses[run.run_id] === "running" &&
+        run.status === "completed" &&
+        run.response &&
+        isDiscovererResponse(run.response)
+      ) {
+        completedWithResponse = run;
+      }
+    }
+
+    runStatusRef.current = nextStatuses;
+    setDiscoverRuns(nextRuns);
+
+    if (completedWithResponse && isDiscovererResponse(completedWithResponse.response)) {
+      setResult(completedWithResponse.response);
+      setError("");
+      setCommitMessage(`chore: update discoverer outputs for ${completedWithResponse.project}`);
+    }
+  }, []);
+
+  const runDiscoverer = useCallback(async (target: DiscoverTarget) => {
     if (!canRun) return;
     setLoading(true);
     setError("");
-    setResult(null);
     setReview(null);
     setReviewError("");
     setCommitError("");
     setCommitSuccess("");
     try {
-      const res = await fetch("/api/discoverer", {
+      const res = await fetch("/api/discoverer/agent-run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          target,
           workspacePath,
           project,
           persistTests,
           persistDocs,
         }),
       });
-      const data = (await res.json()) as DiscovererResponse | { error?: string };
+      const data = (await res.json()) as { error?: string; run_id?: string; target?: DiscoverTarget; project?: string };
       if (!res.ok) {
-        setError((data as { error?: string }).error ?? "Discoverer failed");
+        setError(data.error ?? "Discoverer failed to start");
         return;
       }
-      setResult(data as DiscovererResponse);
-      setCommitMessage(`chore: update discoverer outputs for ${project}`);
+
+      const runId = String(data.run_id ?? "");
+      const now = new Date().toISOString();
+      if (runId) {
+        runStatusRef.current = { ...runStatusRef.current, [runId]: "running" };
+        setDiscoverRuns((prev) => {
+          if (prev.some((run) => run.run_id === runId)) return prev;
+          return [
+            {
+              run_id: runId,
+              target,
+              project,
+              workspacePath,
+              persistTests,
+              persistDocs,
+              status: "running",
+              started_at: now,
+              pid: 0,
+            },
+            ...prev,
+          ];
+        });
+      }
+      void loadDiscoverRuns(project);
     } catch {
       setError("Network error while running Discoverer");
     } finally {
       setLoading(false);
     }
-  }, [canRun, workspacePath, project, persistTests, persistDocs]);
+  }, [canRun, workspacePath, project, persistTests, persistDocs, loadDiscoverRuns]);
 
   const loadReview = useCallback(async (files: string[]) => {
     if (files.length === 0) {
@@ -213,6 +338,23 @@ export default function DiscovererPage() {
     void loadReview(reviewTargets);
   }, [result, reviewTargets, loadReview]);
 
+  useEffect(() => {
+    if (!project.trim()) {
+      setDiscoverRuns([]);
+      runStatusRef.current = {};
+      return;
+    }
+    runStatusRef.current = {};
+    void loadDiscoverRuns(project);
+    const poll = setInterval(() => {
+      void loadDiscoverRuns(project);
+    }, 5000);
+
+    return () => {
+      clearInterval(poll);
+    };
+  }, [project, loadDiscoverRuns]);
+
   async function commitReviewedChanges() {
     if (!reviewTargets.length || commitLoading) return;
     setCommitLoading(true);
@@ -248,10 +390,79 @@ export default function DiscovererPage() {
         <div>
           <h1 className="text-lg font-bold" style={{ color: "#e2e8f0" }}>Discoverer</h1>
           <p className="text-xs" style={{ color: "#4a5568" }}>
-            Analyze a workspace, generate test cases/docs, then review and commit generated artifacts.
+            Analyze a workspace, generate test cases/docs in background, then review and commit generated artifacts.
           </p>
         </div>
       </div>
+
+      {(runningRuns.length > 0 || recentFinishedRuns.length > 0) && (
+        <div className="fixed top-[60px] right-4 z-50 w-full max-w-sm">
+          <div
+            className="rounded-lg p-3 space-y-2"
+            style={{
+              background: "rgba(10,14,26,0.95)",
+              border: "1px solid rgba(0,212,255,0.25)",
+              boxShadow: "0 10px 30px rgba(0,0,0,0.35)",
+            }}
+          >
+            <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>
+              Discoverer Runs
+            </div>
+
+            {runningRuns.map((run) => (
+              <div key={run.run_id} className="rounded px-2 py-1.5" style={{ background: "rgba(30,45,74,0.45)", border: "1px solid rgba(30,45,74,0.7)" }}>
+                <div className="flex items-center gap-2 text-xs" style={{ color: targetColor(run.target) }}>
+                  <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 1 1-9-9" />
+                  </svg>
+                  <span className="font-mono">{run.target} · {run.project}</span>
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                  started {formatTime(run.started_at)}
+                </div>
+              </div>
+            ))}
+
+            {recentFinishedRuns.map((run) => (
+              <div
+                key={run.run_id}
+                className="rounded px-2 py-1.5"
+                style={{
+                  background: run.status === "completed" ? "rgba(0,255,136,0.08)" : "rgba(255,68,68,0.08)",
+                  border: `1px solid ${run.status === "completed" ? "rgba(0,255,136,0.3)" : "rgba(255,68,68,0.3)"}`,
+                }}
+              >
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span style={{ color: run.status === "completed" ? "#00ff88" : "#ff4444" }} className="font-mono">
+                    {run.target} · {run.project} · {run.status}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setDismissedRunIds((prev) => {
+                      const next = prev.includes(run.run_id) ? prev : [...prev, run.run_id];
+                      localStorage.setItem("dismissedDiscovererRunIds", JSON.stringify(next));
+                      return next;
+                    })}
+                    className="w-5 h-5 rounded text-[10px]"
+                    style={{ background: "rgba(30,45,74,0.6)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+                    title="Dismiss"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="text-[11px] mt-0.5" style={{ color: "#94a3b8" }}>
+                  started {formatTime(run.started_at)}
+                </div>
+                {run.status === "failed" && run.summary && (
+                  <pre className="text-[10px] mt-1 rounded p-1 overflow-x-auto whitespace-pre-wrap break-all" style={{ background: "rgba(0,0,0,0.3)", color: "#f87171", maxHeight: "8rem" }}>
+                    {run.summary.slice(-800)}
+                  </pre>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card p-4 space-y-4" style={{ background: "rgba(30,45,74,0.35)", border: "1px solid #1e2d4a", borderRadius: 12 }}>
         <div className="grid md:grid-cols-2 gap-4">
@@ -297,18 +508,46 @@ export default function DiscovererPage() {
           </label>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void runDiscoverer()}
-          disabled={!canRun}
-          className="px-4 py-2 rounded text-sm font-semibold"
-          style={{
-            background: canRun ? "linear-gradient(135deg,#00ff88,#00d4ff)" : "rgba(30,45,74,0.5)",
-            color: canRun ? "#0a0e1a" : "#4a5568",
-          }}
-        >
-          {loading ? "Discovering..." : "Run Discoverer"}
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void runDiscoverer("api")}
+            disabled={!canRun}
+            className="px-3 py-2 rounded text-sm font-semibold"
+            style={{
+              background: canRun ? "linear-gradient(135deg,#00ff88,#00d4ff)" : "rgba(30,45,74,0.5)",
+              color: canRun ? "#0a0e1a" : "#4a5568",
+            }}
+          >
+            {loading ? "Starting..." : "Discover via API"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runDiscoverer("claude")}
+            disabled={!canRun}
+            className="px-3 py-2 rounded text-sm font-semibold"
+            style={{
+              background: canRun ? "rgba(249,115,22,0.16)" : "rgba(30,45,74,0.5)",
+              color: canRun ? "#fdba74" : "#4a5568",
+              border: "1px solid rgba(249,115,22,0.35)",
+            }}
+          >
+            {loading ? "Starting..." : "Discover via Claude Code"}
+          </button>
+          <button
+            type="button"
+            onClick={() => void runDiscoverer("opencode")}
+            disabled={!canRun}
+            className="px-3 py-2 rounded text-sm font-semibold"
+            style={{
+              background: canRun ? "rgba(168,85,247,0.16)" : "rgba(30,45,74,0.5)",
+              color: canRun ? "#d8b4fe" : "#4a5568",
+              border: "1px solid rgba(168,85,247,0.35)",
+            }}
+          >
+            {loading ? "Starting..." : "Discover via Opencode"}
+          </button>
+        </div>
 
         {error && (
           <div className="text-xs px-3 py-2 rounded" style={{ color: "#f87171", background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)" }}>

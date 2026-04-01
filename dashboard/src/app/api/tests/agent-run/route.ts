@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { spawn } from "child_process";
 import fs from "fs";
 import path from "path";
+import { getProjectPaths, getReadableProjectPaths } from "@/app/lib/tests-paths";
 
 type AgentTarget = "claude" | "opencode";
 
@@ -24,7 +25,6 @@ interface AgentRun {
 }
 
 const REGRESSION_DIR = path.join(process.cwd(), "..", "regression_tests");
-const RESULTS_DIR = path.join(REGRESSION_DIR, "results");
 const MAX_SUMMARY_BYTES = 8192;
 
 function ensureDir(dir: string) {
@@ -33,11 +33,11 @@ function ensureDir(dir: string) {
 }
 
 function projectRunsDir(project: string) {
-  return path.join(RESULTS_DIR, project, "agent_runs");
+  return getReadableProjectPaths(project).agentRunsDir;
 }
 
 function ensureProjectResultDirs(project: string) {
-  const projectDir = path.join(RESULTS_DIR, project);
+  const projectDir = getProjectPaths(project).projectResultsDir;
   ensureDir(projectDir);
   ensureDir(path.join(projectDir, "recordings"));
   ensureDir(path.join(projectDir, "recordings", "manual"));
@@ -99,8 +99,9 @@ function saveMeta(meta: AgentRun) {
 function refreshMeta(meta: AgentRun): AgentRun {
   if (meta.status !== "running") return meta;
 
-  const exitAbs = path.join(RESULTS_DIR, meta.exit_file);
-  const logAbs = path.join(RESULTS_DIR, meta.log_file);
+  const resultsDir = getReadableProjectPaths(meta.project).resultsDir;
+  const exitAbs = path.join(resultsDir, meta.exit_file);
+  const logAbs = path.join(resultsDir, meta.log_file);
 
   if (fs.existsSync(exitAbs)) {
     const raw = fs.readFileSync(exitAbs, "utf-8").trim();
@@ -176,8 +177,9 @@ function buildAgentShellCommand(target: AgentTarget, prompt: string): string {
 }
 
 function spawnBackgroundRun(meta: AgentRun, prompt: string) {
-  const logAbs = path.join(RESULTS_DIR, meta.log_file);
-  const exitAbs = path.join(RESULTS_DIR, meta.exit_file);
+  const projectPaths = getProjectPaths(meta.project);
+  const logAbs = path.join(projectPaths.resultsDir, meta.log_file);
+  const exitAbs = path.join(projectPaths.resultsDir, meta.exit_file);
   ensureDir(path.dirname(logAbs));
 
   const agentCmd = buildAgentShellCommand(meta.target, prompt);
@@ -185,7 +187,11 @@ function spawnBackgroundRun(meta: AgentRun, prompt: string) {
 
   const child = spawn("sudo", ["-u", "uwu", "bash", "-lc", wrapped], {
     cwd: REGRESSION_DIR,
-    env: process.env,
+    env: {
+      ...process.env,
+      UWU_TEST_CASES_DIR: projectPaths.testCasesDir,
+      UWU_RESULTS_DIR: projectPaths.resultsDir,
+    },
     detached: true,
     stdio: "ignore",
   });
@@ -259,12 +265,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid project" }, { status: 400 });
   }
 
-  ensureDir(RESULTS_DIR);
+  ensureDir(path.join(REGRESSION_DIR, "results"));
 
   const projects = requestedProject
     ? [requestedProject]
     : fs
-        .readdirSync(RESULTS_DIR, { withFileTypes: true })
+        .readdirSync(path.join(REGRESSION_DIR, "results"), { withFileTypes: true })
         .filter((d) => d.isDirectory())
         .map((d) => d.name);
 
