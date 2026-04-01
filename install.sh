@@ -546,12 +546,11 @@ cd "$INSTALL_DIR/openclaw"
 mkdir -p data
 uv sync 2>/dev/null || uv pip install anthropic openai 2>/dev/null || true
 
-# Hand .venv and data ownership to uwu so it can write when running as that user
-chown -R uwu:uwu "$INSTALL_DIR/openclaw/.venv" 2>/dev/null || true
-chown -R uwu:uwu "$INSTALL_DIR/openclaw/data"  2>/dev/null || true
+chown -R uwu:uwu "$INSTALL_DIR/openclaw" 2>/dev/null || true
 
-# Same for regression_tests .venv — uwu runs test_runner.py via uv
-chown -R uwu:uwu "$INSTALL_DIR/regression_tests/.venv" 2>/dev/null || true
+# uwu runs test_runner.py and the agent creates files (manual_runner.py etc.)
+# in regression_tests — own the entire directory, not just .venv
+chown -R uwu:uwu "$INSTALL_DIR/regression_tests" 2>/dev/null || true
 
 cat > /etc/systemd/system/vps-openclaw.service << EOF
 [Unit]
