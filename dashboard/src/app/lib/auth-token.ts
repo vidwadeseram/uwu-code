@@ -7,16 +7,13 @@ function getAuthSecret(): string {
 }
 
 function toBase64Url(input: Uint8Array): string {
-  const binary = Array.from(input, (byte) => String.fromCharCode(byte)).join("");
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  return Buffer.from(input).toString("base64url");
 }
 
 function fromBase64Url(input: string): Uint8Array | null {
   try {
-    const normalized = input.replace(/-/g, "+").replace(/_/g, "/");
-    const padding = normalized.length % 4 === 0 ? "" : "=".repeat(4 - (normalized.length % 4));
-    const binary = atob(`${normalized}${padding}`);
-    return Uint8Array.from(binary, (char) => char.charCodeAt(0));
+    const base = Buffer.from(input, "base64url");
+    return new Uint8Array(base);
   } catch {
     return null;
   }
@@ -65,7 +62,12 @@ export async function verifySessionToken(token: string | undefined): Promise<Ses
   const [payloadEncoded, signature] = token.split(".");
   if (!payloadEncoded || !signature) return null;
 
-  const expectedSignature = await signValue(payloadEncoded);
+  let expectedSignature: string;
+  try {
+    expectedSignature = await signValue(payloadEncoded);
+  } catch {
+    return null;
+  }
   if (!constantTimeEqual(signature, expectedSignature)) return null;
 
   const payloadBytes = fromBase64Url(payloadEncoded);
