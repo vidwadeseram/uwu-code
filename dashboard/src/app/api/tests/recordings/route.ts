@@ -9,7 +9,8 @@ const RESULTS_DIR = path.join(process.cwd(), "..", "regression_tests", "results"
  * Serves a recording video file.
  */
 export async function GET(req: NextRequest) {
-  const file = new URL(req.url).searchParams.get("file");
+  const rawFile = new URL(req.url).searchParams.get("file");
+  const file = rawFile?.startsWith("results/") ? rawFile.slice("results/".length) : rawFile;
 
   // Validate: only allow paths within RESULTS_DIR, no traversal
   if (!file || file.includes("..") || !file.match(/^[a-zA-Z0-9_\-/]+\.(webm|mp4)$/)) {

@@ -53,6 +53,16 @@ function asRunResult(value: unknown, defaultProject: string): RunResult | null {
   if (typeof row.run_id !== "string" || typeof row.started_at !== "string") return null;
   if (!Array.isArray(row.results)) return null;
 
+  const normalizedResults = row.results
+    .filter((item): item is CaseResult => !!item && typeof item === "object")
+    .map((item) => ({
+      ...item,
+      recording:
+        typeof item.recording === "string"
+          ? normalizeRecordingPath(item.recording)
+          : item.recording ?? undefined,
+    }));
+
   return {
     project: typeof row.project === "string" && row.project.length > 0 ? row.project : defaultProject,
     run_id: row.run_id,
@@ -61,7 +71,7 @@ function asRunResult(value: unknown, defaultProject: string): RunResult | null {
     passed: Number(row.passed ?? 0),
     failed: Number(row.failed ?? 0),
     skipped: Number(row.skipped ?? 0),
-    results: row.results as CaseResult[],
+    results: normalizedResults,
   };
 }
 
@@ -112,18 +122,23 @@ function normalizeRecordingPath(value: string | undefined): string | undefined {
   const raw = value.trim().replace(/^`|`$/g, "");
   if (!raw) return undefined;
 
-  const normalized = raw.replace(/\\/g, "/");
+  const normalized = raw.replace(/\\/g, "/").replace(/\/+/g, "/");
+  if (normalized.includes("..") || normalized.includes("\0")) return undefined;
+
   const resultsPrefix = RESULTS_DIR.replace(/\\/g, "/") + "/";
   if (normalized.startsWith(resultsPrefix)) {
-    return normalized.slice(resultsPrefix.length);
+    const rel = normalized.slice(resultsPrefix.length);
+    return rel.startsWith("/") || rel.includes("..") ? undefined : rel;
   }
   if (normalized.startsWith("results/")) {
-    return normalized.slice("results/".length);
+    const rel = normalized.slice("results/".length);
+    return rel.startsWith("/") || rel.includes("..") ? undefined : rel;
   }
 
   const inPath = normalized.indexOf("/results/");
   if (inPath >= 0) {
-    return normalized.slice(inPath + "/results/".length);
+    const rel = normalized.slice(inPath + "/results/".length);
+    return rel.startsWith("/") || rel.includes("..") ? undefined : rel;
   }
 
   if (/^[a-zA-Z0-9_-]+\/.+\.(webm|mp4)$/i.test(normalized)) {

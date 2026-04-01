@@ -162,7 +162,7 @@ function buildPrompt(project: string, runId: string, workflowIds: string[], case
     "(b) After any form submission wait at least 3 seconds before checking the result.",
     "(c) If the page URL stays on signup/register after submitting but 'verifications' appears in localStorage (even as 'undefined') or no error text is visible, treat registration as SUCCESS — this app triggers phone OTP verification server-side without a page redirect.",
     `For every case, capture a recording and keep artifacts under results/${project}/recordings/manual/${runId}/<case_id>/.`,
-    `After all cases, call save_results tool with full details and set run_id to ${runId}. Include recording path for each case.`,
+    `After all cases, call save_results tool with full details and set run_id to ${runId}. Include recording path for each case using a path relative to results root (example: ${project}/recordings/manual/${runId}/web_login/video.webm). Do NOT prefix recording paths with 'results/'.`,
     "If save_results fails for any reason, still print final report lines exactly in this format: - `<case_id>`: PASS|FAIL|SKIPPED. Recording: `<absolute_or_results_relative_path>`.",
     "Finally return a detailed pass/fail report for each case.",
   ].join(" ");
