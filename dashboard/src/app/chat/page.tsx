@@ -7,6 +7,24 @@ interface Message {
   content: string;
 }
 
+interface ProjectInfo {
+  name: string;
+  path: string;
+  lastModified: string;
+  branch: string;
+  remoteUrl: string;
+}
+
+interface ProjectGroup {
+  name: string;
+  path: string;
+  projects: ProjectInfo[];
+}
+
+interface ProjectsData {
+  groups: ProjectGroup[];
+}
+
 function MarkdownText({ text }: { text: string }) {
   // Simple markdown rendering for code blocks and inline code
   const parts = text.split(/(```[\s\S]*?```|`[^`]+`)/g);
@@ -142,8 +160,34 @@ export default function ChatPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [workspaces, setWorkspaces] = useState<string[]>([]);
+  const [workspacePath, setWorkspacePath] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const loadWorkspaces = async () => {
+      try {
+        const res = await fetch("/api/projects");
+        if (!res.ok) return;
+        const data = (await res.json()) as ProjectsData;
+        const next = Array.from(
+          new Set((data.groups ?? []).flatMap((group) => (group.projects ?? []).map((project) => project.path)).filter(Boolean))
+        ).sort((a, b) => a.localeCompare(b));
+        if (!mounted) return;
+        setWorkspaces(next);
+        if (!workspacePath && next.length > 0) {
+          setWorkspacePath(next[0]);
+        }
+      } catch {
+      }
+    };
+    loadWorkspaces();
+    return () => {
+      mounted = false;
+    };
+  }, [workspacePath]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -163,7 +207,7 @@ export default function ChatPage() {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: updated }),
+        body: JSON.stringify({ messages: updated, workspacePath: workspacePath || undefined }),
       });
       const data = await res.json();
       if (res.ok && data.message) {
@@ -219,20 +263,38 @@ export default function ChatPage() {
             <span className="text-xs" style={{ color: "#00ff88" }}>online</span>
           </div>
         </div>
-        {!isEmpty && (
-          <button
-            onClick={clearChat}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors"
-            style={{ background: "rgba(30,45,74,0.5)", color: "#4a5568", border: "1px solid #1e2d4a" }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#4a5568")}
-          >
-            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
-            </svg>
-            Clear
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {workspaces.length > 0 && (
+            <select
+              value={workspacePath}
+              onChange={(e) => setWorkspacePath(e.target.value)}
+              className="px-2 py-1.5 rounded-lg text-xs max-w-[360px]"
+              style={{ background: "rgba(30,45,74,0.5)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+              title="Workspace knowledge context"
+            >
+              {workspaces.map((ws) => (
+                <option key={ws} value={ws}>
+                  {ws}
+                </option>
+              ))}
+            </select>
+          )}
+
+          {!isEmpty && (
+            <button
+              onClick={clearChat}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors"
+              style={{ background: "rgba(30,45,74,0.5)", color: "#4a5568", border: "1px solid #1e2d4a" }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#4a5568")}
+            >
+              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
+              </svg>
+              Clear
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages */}

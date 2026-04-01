@@ -48,6 +48,17 @@ const NAV = [
     ),
   },
   {
+    href: "/discoverer",
+    label: "Discoverer",
+    exact: false,
+    color: "#22c55e",
+    icon: (
+      <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+    ),
+  },
+  {
     href: "/scheduler",
     label: "Scheduler",
     exact: false,
