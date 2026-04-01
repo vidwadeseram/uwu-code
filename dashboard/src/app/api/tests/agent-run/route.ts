@@ -174,7 +174,14 @@ function buildAgentShellCommand(target: AgentTarget, prompt: string): string {
   if (target === "claude") {
     return `cd /home/uwu && claude --dangerously-skip-permissions -p ${shellQuote(prompt)}`;
   }
-  return `cd ${shellQuote(REGRESSION_DIR)} && opencode run --dir ${shellQuote(REGRESSION_DIR)} ${shellQuote(prompt)}`;
+  const opencodeLookup = [
+    "OPENCODE_BIN=\"$(command -v opencode || true)\"",
+    "[ -z \"$OPENCODE_BIN\" ] && [ -x /usr/local/bin/opencode ] && OPENCODE_BIN=/usr/local/bin/opencode",
+    "[ -z \"$OPENCODE_BIN\" ] && [ -x /home/uwu/.local/bin/opencode ] && OPENCODE_BIN=/home/uwu/.local/bin/opencode",
+  ].join("; ");
+
+  const runOpencode = `cd ${shellQuote(REGRESSION_DIR)} && "$OPENCODE_BIN" run --dir ${shellQuote(REGRESSION_DIR)} ${shellQuote(prompt)}`;
+  return `${opencodeLookup}; if [ -n "$OPENCODE_BIN" ]; then ${runOpencode}; else echo "opencode not found" >&2; exit 1; fi`;
 }
 
 function spawnBackgroundRun(meta: AgentRun, prompt: string) {
@@ -186,16 +193,28 @@ function spawnBackgroundRun(meta: AgentRun, prompt: string) {
   const agentCmd = buildAgentShellCommand(meta.target, prompt);
   const wrapped = `${agentCmd} > ${shellQuote(logAbs)} 2>&1; code=$?; echo $code > ${shellQuote(exitAbs)}`;
 
-  const child = spawn("sudo", ["-u", "uwu", "bash", "-lc", wrapped], {
-    cwd: REGRESSION_DIR,
-    env: {
-      ...process.env,
-      UWU_TEST_CASES_DIR: projectPaths.testCasesDir,
-      UWU_RESULTS_DIR: projectPaths.resultsDir,
-    },
-    detached: true,
-    stdio: "ignore",
-  });
+  const env = {
+    ...process.env,
+    HOME: "/home/uwu",
+    PATH: `${process.env.PATH ?? ""}:/usr/local/bin:/home/uwu/.local/bin`,
+    UWU_TEST_CASES_DIR: projectPaths.testCasesDir,
+    UWU_RESULTS_DIR: projectPaths.resultsDir,
+  };
+
+  const canSetUser = typeof process.getuid === "function" && process.getuid() === 0;
+  const child = canSetUser
+    ? spawn("sudo", ["-u", "uwu", "bash", "-lc", wrapped], {
+        cwd: REGRESSION_DIR,
+        env,
+        detached: true,
+        stdio: "ignore",
+      })
+    : spawn("bash", ["-lc", wrapped], {
+        cwd: REGRESSION_DIR,
+        env,
+        detached: true,
+        stdio: "ignore",
+      });
 
   child.unref();
   return child.pid ?? 0;
