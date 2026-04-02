@@ -29,6 +29,7 @@ body {
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
   min-height: 100vh;
   scroll-behavior: smooth;
+  overflow-x: hidden;
 }
 
 /* Custom scrollbar */
@@ -144,6 +145,18 @@ body {
 }
 .data-table tr:hover td {
   background-color: rgba(0, 212, 255, 0.04);
+}
+
+@media (max-width: 640px) {
+  .data-table th {
+    padding: 8px 10px;
+    font-size: 0.6rem;
+  }
+
+  .data-table td {
+    padding: 8px 10px;
+    font-size: 0.72rem;
+  }
 }
 
 /* Pulse dot */
