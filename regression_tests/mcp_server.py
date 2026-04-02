@@ -22,8 +22,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
-TEST_CASES_DIR = BASE_DIR / "test_cases"
-RESULTS_DIR = BASE_DIR / "results"
+TEST_CASES_DIR = Path(os.getenv("UWU_TEST_CASES_DIR") or (BASE_DIR / "test_cases"))
+RESULTS_DIR = Path(os.getenv("UWU_RESULTS_DIR") or (BASE_DIR / "results"))
 
 SERVER_INFO = {"name": "uwu-code", "version": "1.0.0"}
 PROTOCOL_VERSION = "2024-11-05"
@@ -72,15 +72,65 @@ def _resource_templates():
 # ── Resource handlers ─────────────────────────────────────────────────────────
 
 def handle_list_projects() -> str:
-    projects = sorted(f.stem for f in TEST_CASES_DIR.glob("*.json"))
+    projects = sorted(
+        f.stem
+        for f in TEST_CASES_DIR.glob("*.json")
+        if not f.name.endswith(".env.json") and not f.name.startswith(".")
+    )
     return json.dumps({"projects": projects}, indent=2)
+
+
+def substitute_vars(text: str, env: dict[str, str]) -> str:
+    for key, value in env.items():
+        text = text.replace(f"{{{{{key}}}}}", value)
+    return text
+
+
+def read_project_env(slug: str) -> dict[str, str]:
+    env_file = TEST_CASES_DIR / f"{slug}.env.json"
+    if not env_file.exists():
+        return {}
+    try:
+        payload = json.loads(env_file.read_text())
+    except Exception:
+        return {}
+    if not isinstance(payload, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, value in payload.items():
+        if not isinstance(key, str):
+            continue
+        if isinstance(value, (str, int, float)):
+            out[key] = str(value)
+    return out
 
 
 def handle_get_cases(slug: str) -> str:
     f = TEST_CASES_DIR / f"{slug}.json"
     if not f.exists():
         raise ValueError(f"Project '{slug}' not found")
-    return f.read_text()
+    try:
+        payload = json.loads(f.read_text())
+    except Exception:
+        return f.read_text()
+
+    if not isinstance(payload, dict):
+        return json.dumps(payload, indent=2)
+
+    env = read_project_env(slug)
+    if not env:
+        return json.dumps(payload, indent=2)
+
+    cases = payload.get("test_cases")
+    if isinstance(cases, list):
+        for case in cases:
+            if not isinstance(case, dict):
+                continue
+            task = case.get("task")
+            if isinstance(task, str):
+                case["task"] = substitute_vars(task, env)
+
+    return json.dumps(payload, indent=2)
 
 
 def handle_get_results_summary(slug: str) -> str:
