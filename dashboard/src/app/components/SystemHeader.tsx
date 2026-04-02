@@ -89,8 +89,8 @@ export default function SystemHeader({
   return (
     <div className="space-y-3">
       {/* Top bar: hostname + refresh */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <span
               className="w-2 h-2 rounded-full pulse-dot"
@@ -126,16 +126,17 @@ export default function SystemHeader({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
           {lastRefresh && (
             <span className="text-xs hidden sm:block" style={{ color: "#4a5568" }}>
               Updated {formatRefresh(lastRefresh)}
             </span>
           )}
           <button
+            type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all"
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all min-h-[38px]"
             style={{
               background: refreshing
                 ? "rgba(30, 45, 74, 0.5)"

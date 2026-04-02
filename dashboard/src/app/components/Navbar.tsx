@@ -107,7 +107,9 @@ export default function Navbar() {
       try {
         const res = await fetch("/api/system");
         if (res.ok) setSystemInfo(await res.json());
-      } catch {}
+      } catch {
+        setSystemInfo(null);
+      }
     };
     fetchSystem();
     const interval = setInterval(fetchSystem, 30000);
@@ -137,7 +139,7 @@ export default function Navbar() {
         className="fixed top-0 left-0 right-0 z-50 border-b"
         style={{ background: "rgba(10,14,26,0.97)", borderColor: "#1e2d4a", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" }}
       >
-        <div className="max-w-screen-2xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
+        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 h-14 flex items-center justify-between gap-2 sm:gap-4">
 
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2 flex-shrink-0">
@@ -198,7 +200,7 @@ export default function Navbar() {
           </div>
 
           {/* Right: system info + clock */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 min-w-0">
             {systemInfo && (
               <div className="hidden lg:flex items-center gap-2 text-xs" style={{ color: "#4a5568" }}>
                 <div className="flex items-center gap-1.5">
@@ -213,12 +215,13 @@ export default function Navbar() {
                 </div>
               </div>
             )}
-            <div className="px-2 py-0.5 rounded font-mono text-xs" style={{ background: "rgba(30,45,74,0.5)", color: "#ffd700", minWidth: "62px", textAlign: "center" }}>
+            <div className="px-1.5 sm:px-2 py-0.5 rounded font-mono text-xs" style={{ background: "rgba(30,45,74,0.5)", color: "#ffd700", minWidth: "54px", textAlign: "center" }}>
               {currentTime}
             </div>
 
             {/* Mobile menu button */}
             <button
+              type="button"
               className="md:hidden flex items-center justify-center w-8 h-8 rounded"
               style={{ background: "rgba(30,45,74,0.5)", color: "#94a3b8" }}
               onClick={() => setMenuOpen((v) => !v)}
@@ -240,7 +243,7 @@ export default function Navbar() {
       {/* Mobile dropdown */}
       {menuOpen && (
         <div
-          className="fixed top-14 left-0 right-0 z-40 border-b py-2"
+          className="fixed top-14 left-0 right-0 z-40 border-b py-2 max-h-[calc(100vh-3.5rem)] overflow-y-auto"
           style={{ background: "rgba(10,14,26,0.98)", borderColor: "#1e2d4a", backdropFilter: "blur(16px)" }}
         >
           {NAV.map((link) => {
