@@ -1557,7 +1557,7 @@ export default function TestsPage() {
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
             className="w-8 h-8 rounded flex items-center justify-center"
@@ -1587,7 +1587,7 @@ export default function TestsPage() {
       </div>
 
       {(running || runningAgentRuns.length > 0 || recentFinishedAgentRuns.length > 0) && (
-        <div className="fixed top-[60px] right-4 z-50 w-full max-w-sm">
+        <div className="fixed top-[60px] inset-x-3 sm:inset-x-auto sm:right-4 z-50 sm:w-full max-w-sm">
           <div
             className="rounded-lg p-3 space-y-2"
             style={{
@@ -1678,7 +1678,7 @@ export default function TestsPage() {
 
           {showNewProject && (
             <div className="space-y-2">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   className="flex-1 px-3 py-1.5 rounded text-xs outline-none"
                   style={INPUT_STYLE}

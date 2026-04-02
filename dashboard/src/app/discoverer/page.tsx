@@ -536,7 +536,7 @@ export default function DiscovererPage() {
       </div>
 
       {(runningRuns.length > 0 || recentFinishedRuns.length > 0) && (
-        <div className="fixed top-[60px] right-4 z-50 w-full max-w-sm">
+        <div className="fixed top-[60px] inset-x-3 sm:inset-x-auto sm:right-4 z-50 sm:w-full max-w-sm">
           <div
             className="rounded-lg p-3 space-y-2"
             style={{
@@ -614,7 +614,7 @@ export default function DiscovererPage() {
         <div className="grid md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <span className="text-xs" style={{ color: "#94a3b8" }}>Workspace path</span>
-            <div className="flex gap-2 items-center">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
               <FolderTreePicker
                 value={workspacePath}
                 onSelect={handleWorkspaceSelect}
@@ -761,7 +761,7 @@ export default function DiscovererPage() {
 
       {result && (
         <div className="space-y-4">
-          <div className="grid md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="card p-3" style={{ background: "rgba(30,45,74,0.35)", border: "1px solid #1e2d4a", borderRadius: 10 }}>
               <div className="text-xs" style={{ color: "#4a5568" }}>Project</div>
               <div className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>{result.project}</div>
@@ -776,7 +776,7 @@ export default function DiscovererPage() {
             </div>
           </div>
 
-          <div className="grid lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card p-3 space-y-2" style={{ background: "rgba(30,45,74,0.35)", border: "1px solid #1e2d4a", borderRadius: 10 }}>
               <div className="text-xs font-semibold" style={{ color: "#00d4ff" }}>Generated test config</div>
               <pre className="text-xs overflow-auto rounded p-3" style={{ background: "#0f172a", color: "#e2e8f0", maxHeight: 420 }}>
@@ -820,7 +820,7 @@ export default function DiscovererPage() {
           </div>
 
           <div className="card p-4 space-y-3" style={{ background: "rgba(30,45,74,0.35)", border: "1px solid #1e2d4a", borderRadius: 12 }}>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>Review & Commit</div>
                 <div className="text-xs" style={{ color: "#94a3b8" }}>Review generated file diffs, then commit directly.</div>
@@ -891,7 +891,7 @@ export default function DiscovererPage() {
                   ))}
                 </div>
 
-                <div className="grid md:grid-cols-[1fr_auto] gap-2 items-center pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-center pt-1">
                   <input
                     value={commitMessage}
                     onChange={(e) => setCommitMessage(e.target.value)}
@@ -929,7 +929,7 @@ export default function DiscovererPage() {
           </div>
 
           <div className="card p-4 space-y-3" style={{ background: "rgba(30,45,74,0.35)", border: "1px solid #1e2d4a", borderRadius: 12 }}>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
                 <div className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>History</div>
                 <div className="text-xs" style={{ color: "#94a3b8" }}>See what changed in generated files and revert to a previous snapshot.</div>

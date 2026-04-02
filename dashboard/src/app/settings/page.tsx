@@ -29,7 +29,7 @@ const INPUT: React.CSSProperties = {
 
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="card p-5 flex flex-col gap-4">
+    <div className="card p-4 sm:p-5 flex flex-col gap-4">
       <div className="flex items-center gap-2 pb-1 border-b" style={{ borderColor: "#1e2d4a" }}>
         <span style={{ color: "#00d4ff" }}>{icon}</span>
         <h2 className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>{title}</h2>
@@ -123,7 +123,7 @@ function ApiKeysSection({ authed }: { authed: boolean }) {
           <div key={k} className="flex flex-col gap-1">
             <label className="text-xs font-medium" style={{ color: meta.color }}>{meta.label}</label>
             <div className="text-xs mb-0.5" style={{ color: "#2e4a7a" }}>{meta.hint}</div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type={reveal[k] ? "text" : "password"}
                 placeholder={keys[k] || "Not set"}
@@ -633,9 +633,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="max-w-screen-md mx-auto px-4 py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="max-w-screen-md mx-auto px-4 py-6 space-y-6">
+        {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded flex items-center justify-center"

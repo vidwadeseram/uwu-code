@@ -548,7 +548,7 @@ function NewTaskForm({
 
       <div className="flex flex-col gap-1">
         <label className="text-xs" htmlFor="schedule-mode" style={{ color: "#4a5568" }}>Schedule</label>
-        <div id="schedule-mode" className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <div id="schedule-mode" className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
           {([
             { key: "anytime", label: "Queue Now" },
             { key: "once", label: "One-Time" },
@@ -600,12 +600,12 @@ function NewTaskForm({
       )}
 
       {scheduleMode === "weekly" && (
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs" htmlFor="weekly-day" style={{ color: "#4a5568" }}>Day</label>
             <select
               id="weekly-day"
-              style={{ ...SELECT, width: "120px" }}
+              style={{ ...SELECT, width: "100%" }}
               value={weeklyDay}
               onChange={(e) => setWeeklyDay(Number(e.target.value))}
             >
@@ -617,7 +617,7 @@ function NewTaskForm({
             <input
               id="weekly-time"
               type="time"
-              style={{ ...INPUT, width: "120px" }}
+              style={{ ...INPUT, width: "100%" }}
               value={weeklyTime}
               onChange={(e) => setWeeklyTime(e.target.value)}
             />
@@ -639,19 +639,18 @@ function NewTaskForm({
 
       {/* Workspace + Tool (coding only) */}
       {type === "coding" && (
-        <div className="flex gap-3">
+        <div className="flex flex-col lg:flex-row gap-3">
           <div className="flex flex-col gap-1 flex-1">
             <div className="text-xs" style={{ color: "#4a5568" }}>Workspace</div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
                 onClick={openPicker}
-                className="px-3 py-2 rounded text-xs font-medium"
+                className="px-3 py-2 rounded text-xs font-medium sm:w-auto w-full"
                 style={{
                   background: "rgba(0,212,255,0.12)",
                   color: "#00d4ff",
                   border: "1px solid rgba(0,212,255,0.3)",
-                  minWidth: "120px",
                 }}
               >
                 Select Folder
@@ -672,11 +671,11 @@ function NewTaskForm({
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-1 lg:w-[140px]">
             <label className="text-xs" htmlFor="tool" style={{ color: "#4a5568" }}>Tool</label>
             <select
               id="tool"
-              style={{ ...SELECT, width: "120px" }}
+              style={{ ...SELECT, width: "100%" }}
               value={tool}
               onChange={(e) => setTool(e.target.value as "auto" | "claude" | "opencode")}
             >
@@ -712,7 +711,7 @@ function NewTaskForm({
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <button
           onClick={submit}
           type="button"
@@ -874,7 +873,7 @@ export default function SchedulerPage() {
   return (
     <div className="max-w-screen-lg mx-auto px-4 py-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <div
             className="w-9 h-9 rounded flex items-center justify-center"
@@ -898,8 +897,8 @@ export default function SchedulerPage() {
         </div>
 
         {/* Stats + new button */}
-        <div className="flex items-center gap-3">
-          <div className="flex gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-2 text-xs">
             {running > 0 && (
               <span className="px-2 py-1 rounded" style={{ background: "rgba(0,212,255,0.1)", color: "#00d4ff", border: "1px solid rgba(0,212,255,0.2)" }}>
                 {running} running
@@ -945,7 +944,7 @@ export default function SchedulerPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b" style={{ borderColor: "#1e2d4a" }}>
+      <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "#1e2d4a" }}>
         {(["active", "completed"] as const).map((t) => (
           <button
             key={t}
