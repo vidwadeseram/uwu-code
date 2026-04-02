@@ -95,6 +95,7 @@ function CloneForm({ onClose, onCloned }: CloneFormProps) {
           style={{ color: "#4a5568" }}
         >
           <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <title>Close</title>
             <line x1="18" y1="6" x2="6" y2="18" />
             <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
@@ -155,10 +156,12 @@ function CloneForm({ onClose, onCloned }: CloneFormProps) {
         >
           {loading ? (
             <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <title>Loading</title>
               <path d="M21 12a9 9 0 1 1-9-9" />
             </svg>
           ) : (
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <title>Clone repository</title>
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
@@ -229,6 +232,7 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Projects</title>
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
           <h2
@@ -276,6 +280,7 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
             }}
           >
             <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <title>Add project</title>
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -304,6 +309,7 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
+              <title>Toggle projects panel</title>
               <polyline points="6 9 12 15 18 9" />
             </svg>
           </button>
@@ -342,6 +348,7 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
               style={{ color: "#4a5568" }}
             >
               <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <title>No projects</title>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               </svg>
               <div className="text-sm">No projects found in /opt/workspaces</div>
@@ -400,6 +407,7 @@ function GroupSection({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Toggle group</title>
             <polyline points="9 18 15 12 9 6" />
           </svg>
           <svg
@@ -412,6 +420,7 @@ function GroupSection({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Project group</title>
             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
           </svg>
           <span className="font-semibold text-sm" style={{ color: "#e2e8f0" }}>
@@ -458,7 +467,7 @@ function ProjectRow({
   deleting: boolean;
   onDelete: () => void;
 }) {
-  const terminalUrl = "https://code.vidwadeseram.com/terminal/";
+  const terminalUrl = "/terminal/";
 
   return (
     <div
@@ -487,6 +496,7 @@ function ProjectRow({
               }}
             >
               <svg className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <title>Branch</title>
                 <line x1="6" y1="3" x2="6" y2="15" />
                 <circle cx="18" cy="6" r="3" />
                 <circle cx="6" cy="18" r="3" />
@@ -550,6 +560,7 @@ function ProjectRow({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
+            <title>Open terminal</title>
             <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
             <line x1="8" y1="21" x2="16" y2="21" />
             <line x1="12" y1="17" x2="12" y2="21" />
