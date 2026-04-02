@@ -4,8 +4,6 @@ import path from "path";
 import { execFile } from "child_process";
 import {
   allowedWorkspaceRoots,
-  buildAgentDocs,
-  buildTestConfigFromContext,
   collectWorkspaceContext,
   DiscovererCase,
   DiscovererMergeReport,
@@ -97,7 +95,8 @@ function summarizeCliText(raw: string, maxChars = 500): string {
 }
 
 function trimErrorMessage(raw: string, maxChars = 420): string {
-  const compact = raw.replace(/\s+/g, " ").trim();
+  const withoutAnsi = raw.replace(new RegExp("\\u001b\\[[0-9;]*m", "g"), "");
+  const compact = withoutAnsi.replace(/\s+/g, " ").trim();
   if (!compact) return "Discoverer generation failed";
   return compact.length > maxChars ? `${compact.slice(0, maxChars)}…` : compact;
 }
@@ -127,34 +126,6 @@ function discovererCliModel(target: "claude" | "opencode"): string {
     return settings.models?.discoverer_claude ?? "sonnet";
   }
   return settings.models?.discoverer_opencode ?? "opencode/qwen3.6-plus-free";
-}
-
-function buildFallbackSpec(project: string, sourceUrl: string, context: ReturnType<typeof collectWorkspaceContext>): string {
-  const stack = context.stackHints.length > 0 ? context.stackHints.join(", ") : "unknown";
-  const routes = context.routeHints.slice(0, 20);
-  const scripts = context.runScripts.slice(0, 12);
-  return [
-    `# Discoverer Playwright Spec — ${project}`,
-    "",
-    `## Target URL`,
-    sourceUrl,
-    "",
-    `## Workspace`,
-    `- Path: ${context.workspacePath}`,
-    `- Name: ${context.workspaceName}`,
-    `- Stack hints: ${stack}`,
-    "",
-    "## Navigation Scope",
-    ...(routes.length > 0 ? routes.map((route) => `- ${route}`) : ["- Explore top-level pages linked from the target URL"]),
-    "",
-    "## Runtime Hints",
-    ...(scripts.length > 0 ? scripts.map((script) => `- ${script}`) : ["- No package scripts detected"]),
-    "",
-    "## Required Outcomes",
-    "- Build test cases for homepage load, primary navigation, core forms, and API smoke behavior.",
-    "- Include failure assertions for visible errors and HTTP >= 400 responses.",
-    "- Keep selectors stable and avoid brittle nth-child selectors.",
-  ].join("\n");
 }
 
 function writeCliPromptFile(target: "claude" | "opencode", project: string, prompt: string): string {
@@ -390,7 +361,7 @@ async function generateWithModel(
 }
 
 async function generateSpecWithModel(
-  project: string,
+  _project: string,
   sourceUrl: string,
   context: ReturnType<typeof collectWorkspaceContext>
 ): Promise<{ spec: string; model: string }> {
@@ -636,7 +607,6 @@ async function generateWithCli(
               configuredModel,
               "-f",
               promptFile,
-              "Read the attached file and output ONLY the final JSON object requested there.",
             ],
           },
           {
@@ -650,7 +620,6 @@ async function generateWithCli(
               configuredModel,
               "-f",
               promptFile,
-              "Read the attached file and output ONLY the final JSON object requested there.",
             ],
           },
         ];
@@ -754,7 +723,6 @@ async function generateSpecWithCli(
           configuredModel,
           "-f",
           promptFile,
-          "Read the attached file and output only the requested markdown spec.",
         ];
 
     const result = await runCli(command, args, cwd, envOverrides, envStrip);
@@ -878,9 +846,7 @@ export async function POST(req: NextRequest) {
     specModel = specGenerated.model;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Discoverer spec generation failed";
-    generatedSpec = buildFallbackSpec(project, sourceUrl, context);
-    specModel = "fallback/local-spec";
-    generationWarning = `${trimErrorMessage(message)}. Used local fallback spec generation.`;
+    return NextResponse.json({ error: `Discoverer spec generation failed: ${trimErrorMessage(message, 900)}` }, { status: 503 });
   }
 
   try {
@@ -892,12 +858,7 @@ export async function POST(req: NextRequest) {
     generationModel = generated.model;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Discoverer generation failed";
-    generatedTestConfig = buildTestConfigFromContext(project, context);
-    agentDocs = buildAgentDocs(project, context);
-    generationModel = "fallback/local-context";
-    generationWarning = [generationWarning, `${trimErrorMessage(message)}. Used local workspace fallback generation.`]
-      .filter(Boolean)
-      .join(" ");
+    return NextResponse.json({ error: `Discoverer generation failed: ${trimErrorMessage(message, 900)}` }, { status: 503 });
   }
 
   let effectiveTestConfig = generatedTestConfig;
