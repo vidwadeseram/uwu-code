@@ -13,8 +13,13 @@ export interface Settings {
   session_token: string;
   models?: {
     tests?: string;
+    tests_claude?: string;
+    tests_opencode?: string;
     openclaw?: string;
     discoverer?: string;
+    discoverer_api?: string;
+    discoverer_claude?: string;
+    discoverer_opencode?: string;
   };
 }
 

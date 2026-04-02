@@ -358,6 +358,23 @@ interface ORModel {
 }
 
 const DEFAULT_TESTS_MODEL = "openai/gpt-5.3-codex";
+const DEFAULT_TESTS_CLAUDE_MODEL = "sonnet";
+const DEFAULT_TESTS_OPENCODE_MODEL = "opencode/qwen3.6-plus-free";
+const DEFAULT_DISCOVERER_API_MODEL = "openrouter/free";
+const DEFAULT_DISCOVERER_CLAUDE_MODEL = "sonnet";
+const DEFAULT_DISCOVERER_OPENCODE_MODEL = "opencode/qwen3.6-plus-free";
+
+const CLAUDE_CODE_MODELS = [
+  { id: "sonnet", name: "Sonnet (Claude Code default)" },
+  { id: "opus", name: "Opus" },
+  { id: "haiku", name: "Haiku" },
+] as const;
+
+const OPENCODE_MODELS = [
+  { id: "opencode/qwen3.6-plus-free", name: "Qwen 3.6 Plus (free)" },
+  { id: "opencode/big-pickle", name: "Big Pickle" },
+  { id: "opencode/gpt-5-nano", name: "GPT-5 Nano" },
+] as const;
 
 function ModelPicker({
   label,
@@ -493,8 +510,12 @@ function ModelPicker({
 function ModelsSection() {
   const [models, setModels] = useState<ORModel[]>([]);
   const [testsModel, setTestsModel] = useState(DEFAULT_TESTS_MODEL);
+  const [testsClaudeModel, setTestsClaudeModel] = useState(DEFAULT_TESTS_CLAUDE_MODEL);
+  const [testsOpencodeModel, setTestsOpencodeModel] = useState(DEFAULT_TESTS_OPENCODE_MODEL);
   const [openclawModel, setOpenclawModel] = useState("openrouter/free");
-  const [discovererModel, setDiscovererModel] = useState("openrouter/free");
+  const [discovererApiModel, setDiscovererApiModel] = useState(DEFAULT_DISCOVERER_API_MODEL);
+  const [discovererClaudeModel, setDiscovererClaudeModel] = useState(DEFAULT_DISCOVERER_CLAUDE_MODEL);
+  const [discovererOpencodeModel, setDiscovererOpencodeModel] = useState(DEFAULT_DISCOVERER_OPENCODE_MODEL);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -506,8 +527,13 @@ function ModelsSection() {
       .then((d) => {
         setModels(d.models ?? []);
         if (d.selected?.tests) setTestsModel(d.selected.tests);
+        if (d.selected?.tests_claude) setTestsClaudeModel(d.selected.tests_claude);
+        if (d.selected?.tests_opencode) setTestsOpencodeModel(d.selected.tests_opencode);
         if (d.selected?.openclaw) setOpenclawModel(d.selected.openclaw);
-        if (d.selected?.discoverer) setDiscovererModel(d.selected.discoverer);
+        if (d.selected?.discoverer_api) setDiscovererApiModel(d.selected.discoverer_api);
+        else if (d.selected?.discoverer) setDiscovererApiModel(d.selected.discoverer);
+        if (d.selected?.discoverer_claude) setDiscovererClaudeModel(d.selected.discoverer_claude);
+        if (d.selected?.discoverer_opencode) setDiscovererOpencodeModel(d.selected.discoverer_opencode);
         if (d.error) setError(d.error);
       })
       .catch(() => setError("Failed to load models"))
@@ -520,7 +546,15 @@ function ModelsSection() {
       const res = await fetch("/api/settings/models", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tests: testsModel, openclaw: openclawModel, discoverer: discovererModel }),
+        body: JSON.stringify({
+          tests: testsModel,
+          tests_claude: testsClaudeModel,
+          tests_opencode: testsOpencodeModel,
+          openclaw: openclawModel,
+          discoverer_api: discovererApiModel,
+          discoverer_claude: discovererClaudeModel,
+          discoverer_opencode: discovererOpencodeModel,
+        }),
       });
       if (res.ok) { setSaved(true); setTimeout(() => setSaved(false), 3000); }
       else { const d = await res.json(); setError(d.error ?? "Save failed"); }
@@ -554,13 +588,45 @@ function ModelsSection() {
 
       <div className="flex flex-col gap-4">
         <ModelPicker
-          label="Tests (browser-use agent)"
+          label="Tests via API (browser-use agent)"
           value={testsModel}
           onChange={setTestsModel}
           models={models}
           loading={loading}
           requireVision
         />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>Test via Claude Code model</label>
+          <select
+            value={testsClaudeModel}
+            onChange={(e) => setTestsClaudeModel(e.target.value)}
+            disabled={loading}
+            className="w-full px-3 py-2 rounded text-xs"
+            style={{ ...INPUT, fontFamily: "monospace" }}
+          >
+            {CLAUDE_CODE_MODELS.map((option) => (
+              <option key={option.id} value={option.id}>{option.name}</option>
+            ))}
+          </select>
+          <div className="text-xs font-mono" style={{ color: "#2e4a7a" }}>{testsClaudeModel}</div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>Test via Opencode model</label>
+          <select
+            value={testsOpencodeModel}
+            onChange={(e) => setTestsOpencodeModel(e.target.value)}
+            disabled={loading}
+            className="w-full px-3 py-2 rounded text-xs"
+            style={{ ...INPUT, fontFamily: "monospace" }}
+          >
+            {OPENCODE_MODELS.map((option) => (
+              <option key={option.id} value={option.id}>{option.name}</option>
+            ))}
+          </select>
+          <div className="text-xs font-mono" style={{ color: "#2e4a7a" }}>{testsOpencodeModel}</div>
+        </div>
+
         <ModelPicker
           label="OpenClaw (research & chat)"
           value={openclawModel}
@@ -570,11 +636,42 @@ function ModelsSection() {
         />
         <ModelPicker
           label="Discoverer (workspace generation)"
-          value={discovererModel}
-          onChange={setDiscovererModel}
+          value={discovererApiModel}
+          onChange={setDiscovererApiModel}
           models={models}
           loading={loading}
         />
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>Discoverer Claude Code model</label>
+          <select
+            value={discovererClaudeModel}
+            onChange={(e) => setDiscovererClaudeModel(e.target.value)}
+            disabled={loading}
+            className="w-full px-3 py-2 rounded text-xs"
+            style={{ ...INPUT, fontFamily: "monospace" }}
+          >
+            {CLAUDE_CODE_MODELS.map((option) => (
+              <option key={option.id} value={option.id}>{option.name}</option>
+            ))}
+          </select>
+          <div className="text-xs font-mono" style={{ color: "#2e4a7a" }}>{discovererClaudeModel}</div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>Discoverer OpenCode model</label>
+          <select
+            value={discovererOpencodeModel}
+            onChange={(e) => setDiscovererOpencodeModel(e.target.value)}
+            disabled={loading}
+            className="w-full px-3 py-2 rounded text-xs"
+            style={{ ...INPUT, fontFamily: "monospace" }}
+          >
+            {OPENCODE_MODELS.map((option) => (
+              <option key={option.id} value={option.id}>{option.name}</option>
+            ))}
+          </select>
+          <div className="text-xs font-mono" style={{ color: "#2e4a7a" }}>{discovererOpencodeModel}</div>
+        </div>
       </div>
 
       {saved && (

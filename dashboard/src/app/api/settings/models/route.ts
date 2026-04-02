@@ -4,6 +4,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAuth, readSettings, writeSettings, readEnvKeys } from "@/app/lib/settings";
 
 const DEFAULT_TESTS_MODEL = "openai/gpt-5.3-codex";
+const DEFAULT_TESTS_CLAUDE_MODEL = "sonnet";
+const DEFAULT_TESTS_OPENCODE_MODEL = "opencode/qwen3.6-plus-free";
+const DEFAULT_DISCOVERER_API_MODEL = "openrouter/free";
+const DEFAULT_DISCOVERER_CLAUDE_MODEL = "sonnet";
+const DEFAULT_DISCOVERER_OPENCODE_MODEL = "opencode/qwen3.6-plus-free";
 
 export interface ORModel {
   id: string;
@@ -80,8 +85,13 @@ export async function GET(_req: NextRequest) {
     models,
     selected: {
       tests: settings.models?.tests ?? DEFAULT_TESTS_MODEL,
+      tests_claude: settings.models?.tests_claude ?? DEFAULT_TESTS_CLAUDE_MODEL,
+      tests_opencode: settings.models?.tests_opencode ?? settings.models?.tests ?? DEFAULT_TESTS_OPENCODE_MODEL,
       openclaw: settings.models?.openclaw ?? "openrouter/free",
-      discoverer: settings.models?.discoverer ?? "openrouter/free",
+      discoverer: settings.models?.discoverer ?? DEFAULT_DISCOVERER_API_MODEL,
+      discoverer_api: settings.models?.discoverer_api ?? settings.models?.discoverer ?? DEFAULT_DISCOVERER_API_MODEL,
+      discoverer_claude: settings.models?.discoverer_claude ?? DEFAULT_DISCOVERER_CLAUDE_MODEL,
+      discoverer_opencode: settings.models?.discoverer_opencode ?? DEFAULT_DISCOVERER_OPENCODE_MODEL,
     },
     error: error || undefined,
   });
@@ -90,14 +100,38 @@ export async function GET(_req: NextRequest) {
 export async function POST(req: NextRequest) {
   if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { tests, openclaw, discoverer } = await req.json() as { tests?: string; openclaw?: string; discoverer?: string };
+  const {
+    tests,
+    tests_claude,
+    tests_opencode,
+    openclaw,
+    discoverer,
+    discoverer_api,
+    discoverer_claude,
+    discoverer_opencode,
+  } = await req.json() as {
+    tests?: string;
+    tests_claude?: string;
+    tests_opencode?: string;
+    openclaw?: string;
+    discoverer?: string;
+    discoverer_api?: string;
+    discoverer_claude?: string;
+    discoverer_opencode?: string;
+  };
   const settings = readSettings();
+  const nextDiscovererApi = discoverer_api ?? discoverer ?? settings.models?.discoverer_api ?? settings.models?.discoverer ?? DEFAULT_DISCOVERER_API_MODEL;
   writeSettings({
     ...settings,
     models: {
       tests: tests ?? settings.models?.tests ?? DEFAULT_TESTS_MODEL,
+      tests_claude: tests_claude ?? settings.models?.tests_claude ?? DEFAULT_TESTS_CLAUDE_MODEL,
+      tests_opencode: tests_opencode ?? settings.models?.tests_opencode ?? settings.models?.tests ?? DEFAULT_TESTS_OPENCODE_MODEL,
       openclaw: openclaw ?? settings.models?.openclaw ?? "openrouter/free",
-      discoverer: discoverer ?? settings.models?.discoverer ?? "openrouter/free",
+      discoverer: nextDiscovererApi,
+      discoverer_api: nextDiscovererApi,
+      discoverer_claude: discoverer_claude ?? settings.models?.discoverer_claude ?? DEFAULT_DISCOVERER_CLAUDE_MODEL,
+      discoverer_opencode: discoverer_opencode ?? settings.models?.discoverer_opencode ?? DEFAULT_DISCOVERER_OPENCODE_MODEL,
     },
   });
   return NextResponse.json({ ok: true });

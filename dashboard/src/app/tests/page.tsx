@@ -8,7 +8,8 @@ type McpTarget = "claude" | "opencode" | "api";
 
 type RunSelectionMode = "all" | "workflows" | "cases";
 
-const DEFAULT_TESTS_MODEL = "openai/gpt-5.3-codex";
+const DEFAULT_TESTS_CLAUDE_MODEL = "sonnet";
+const DEFAULT_TESTS_OPENCODE_MODEL = "opencode/qwen3.6-plus-free";
 
 function McpModal({
   target,
@@ -28,6 +29,8 @@ function McpModal({
   onClose: () => void;
 }) {
   const [regressionDir, setRegressionDir] = useState<string | null>(null);
+  const [testsClaudeModel, setTestsClaudeModel] = useState(DEFAULT_TESTS_CLAUDE_MODEL);
+  const [testsOpencodeModel, setTestsOpencodeModel] = useState(DEFAULT_TESTS_OPENCODE_MODEL);
   const [copied, setCopied] = useState<string | null>(null);
   const [autoRunning, setAutoRunning] = useState(false);
   const [autoError, setAutoError] = useState("");
@@ -38,6 +41,15 @@ function McpModal({
       .then((r) => r.json())
       .then((d) => setRegressionDir(d.regression_dir))
       .catch(() => setRegressionDir("/opt/vps-dashboard/regression_tests"));
+
+    fetch("/api/settings/models")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.selected?.tests_claude) setTestsClaudeModel(String(d.selected.tests_claude));
+        if (d?.selected?.tests_opencode) setTestsOpencodeModel(String(d.selected.tests_opencode));
+        else if (d?.selected?.tests) setTestsOpencodeModel(String(d.selected.tests));
+      })
+      .catch(() => {});
   }, []);
 
   function copy(text: string, key: string) {
@@ -87,8 +99,8 @@ function McpModal({
 
   // Must cd /home/uwu so Claude uses the project scope where the MCP server is registered.
   // Run as uwu (non-root) so --dangerously-skip-permissions is accepted.
-  const claudeCmd = `sudo -u uwu bash -c 'cd /home/uwu && claude --dangerously-skip-permissions -p "${claudePrompt}"'`;
-  const opencodeCmd = `sudo -u uwu opencode run --dir ${dir} --model ${DEFAULT_TESTS_MODEL} "${opencodePrompt}"`;
+  const claudeCmd = `sudo -u uwu bash -c 'cd /home/uwu && CLAUDE_MODEL=${testsClaudeModel} claude --dangerously-skip-permissions --model ${testsClaudeModel} -p "${claudePrompt}"'`;
+  const opencodeCmd = `sudo -u uwu opencode run --dir ${dir} --model ${testsOpencodeModel} "${opencodePrompt}"`;
 
   const isClaudeCode = target === "claude";
   const isApi = target === "api";

@@ -27,8 +27,13 @@ interface AgentRun {
 
 const REGRESSION_DIR = path.join(process.cwd(), "..", "regression_tests");
 const MAX_SUMMARY_BYTES = 8192;
-const DEFAULT_TESTS_MODEL = "openai/gpt-5.3-codex";
-const FALLBACK_OPENCODE_MODEL = "opencode/gpt-5-nano";
+const DEFAULT_TESTS_CLAUDE_MODEL = "sonnet";
+const DEFAULT_TESTS_OPENCODE_MODEL = "opencode/qwen3.6-plus-free";
+const FALLBACK_OPENCODE_MODELS = [
+  "opencode/big-pickle",
+  "opencode/qwen3.6-plus-free",
+  "opencode/gpt-5-nano",
+];
 
 function ensureDir(dir: string) {
   fs.mkdirSync(dir, { recursive: true });
@@ -120,6 +125,31 @@ function refreshMeta(meta: AgentRun): AgentRun {
     return updated;
   }
 
+  const logSummary = readLogSummary(logAbs);
+  if (meta.case_ids.length > 0 && logSummary.length > 0) {
+    const finalResultCount = (logSummary.match(/=== FINAL RESULT ===/g) ?? []).length;
+    if (finalResultCount >= meta.case_ids.length) {
+      try {
+        process.kill(meta.pid, "SIGTERM");
+      } catch {
+      }
+
+      const hasFailureStatus = /"status"\s*:\s*"(FAIL|FAILED|ERROR)"/i.test(logSummary);
+      const hasBrowserErrors = /"browser_errors"\s*:\s*\[\s*[^\]]+/i.test(logSummary);
+      const failed = hasFailureStatus || hasBrowserErrors;
+
+      const updated: AgentRun = {
+        ...meta,
+        status: failed ? "failed" : "completed",
+        completed_at: nowIso(),
+        exit_code: failed ? 1 : 0,
+        summary: logSummary,
+      };
+      saveMeta(updated);
+      return updated;
+    }
+  }
+
   if (!isPidAlive(meta.pid)) {
     const updated: AgentRun = {
       ...meta,
@@ -143,10 +173,19 @@ function parseSelection(value: unknown): string[] {
     .filter((v) => /^[a-zA-Z0-9_-]+$/.test(v));
 }
 
-function resolveTestsModel(): string {
-  const fromSettings = readSettings().models?.tests?.trim();
+function resolveTestsClaudeModel(): string {
+  const settings = readSettings();
+  const fromSettings = settings.models?.tests_claude?.trim();
+  const fromEnv = process.env.CLAUDE_TEST_MODEL?.trim();
+  return fromSettings || fromEnv || DEFAULT_TESTS_CLAUDE_MODEL;
+}
+
+function resolveTestsOpencodeModel(): string {
+  const settings = readSettings();
+  const fromSettings = settings.models?.tests_opencode?.trim();
+  const legacy = settings.models?.tests?.trim();
   const fromEnv = process.env.OPENCODE_TEST_MODEL?.trim();
-  return fromSettings || fromEnv || DEFAULT_TESTS_MODEL;
+  return fromSettings || fromEnv || legacy || DEFAULT_TESTS_OPENCODE_MODEL;
 }
 
 function buildScopeInstruction(workflowIds: string[], caseIds: string[]): string {
@@ -178,17 +217,30 @@ function buildPrompt(project: string, runId: string, workflowIds: string[], case
     "(f) Include browser errors in each case detail JSON under key 'browser_errors'. If browser_errors is non-empty, that case MUST be FAIL (unless the test explicitly expects errors).",
     "(g) Before each case, clear localStorage, sessionStorage, and cookies for the active origin to avoid stale-state false positives.",
     "(h) For allinonepos OTP retrieval, read OTP from tmux session 'allinonepos' window/tab 'pos-commons'.",
+    "(i) Execute immediately in this run. Do NOT ask for confirmation, approval, or extra setup inputs.",
+    "(j) Never ask for BASE_URL or placeholder values. Use resolved case tasks as provided.",
+    "(k) If MCP resource read fails, load cases directly from $UWU_TEST_CASES_DIR/<project>.json and continue.",
+    "(l) Do NOT write or modify repository files. Only execute browser actions and report results.",
     "(d) Keep recording running for at least 20 extra seconds after each case reaches its final assertion before closing the page/context.",
     `For every case, capture a recording and keep artifacts under results/${project}/recordings/manual/${runId}/<case_id>/.`,
     `After all cases, call save_results tool with full details and set run_id to ${runId}. Include recording path for each case using a path relative to results root (example: ${project}/recordings/manual/${runId}/web_login/video.webm). Do NOT prefix recording paths with 'results/'.`,
+    "If save_results fails, retry once with the same payload before finishing.",
     "If save_results fails for any reason, still print final report lines exactly in this format: - `<case_id>`: PASS|FAIL|SKIPPED. Recording: `<absolute_or_results_relative_path>`.",
     "Finally return a detailed pass/fail report for each case.",
   ].join(" ");
 }
 
-function buildAgentShellCommand(target: AgentTarget, prompt: string, testsModel: string): string {
+function buildAgentShellCommand(
+  target: AgentTarget,
+  prompt: string,
+  models: { claude: string; opencode: string }
+): string {
   if (target === "claude") {
-    return `cd /home/uwu && claude --dangerously-skip-permissions -p ${shellQuote(prompt)}`;
+    return [
+      "cd /home/uwu",
+      `CLAUDE_MODEL=${shellQuote(models.claude)}`,
+      `claude --dangerously-skip-permissions --model ${shellQuote(models.claude)} -p ${shellQuote(prompt)}`,
+    ].join(" && ");
   }
   const opencodeLookup = [
     "OPENCODE_BIN=\"$(command -v opencode || true)\"",
@@ -196,13 +248,18 @@ function buildAgentShellCommand(target: AgentTarget, prompt: string, testsModel:
     "[ -z \"$OPENCODE_BIN\" ] && [ -x /home/uwu/.local/bin/opencode ] && OPENCODE_BIN=/home/uwu/.local/bin/opencode",
   ].join("; ");
 
+  const fallbackModels = FALLBACK_OPENCODE_MODELS.map((model) => shellQuote(model)).join(" ");
+
   const runOpencode = [
     `cd ${shellQuote(REGRESSION_DIR)}`,
-    `REQUESTED_MODEL=${shellQuote(testsModel)}`,
-    `FALLBACK_MODEL=${shellQuote(FALLBACK_OPENCODE_MODEL)}`,
+    `REQUESTED_MODEL=${shellQuote(models.opencode)}`,
+    `FALLBACK_MODELS=${shellQuote(fallbackModels)}`,
     "AVAILABLE_MODELS=\"$($OPENCODE_BIN models 2>/dev/null || true)\"",
-    "if printf '%s\\n' \"$AVAILABLE_MODELS\" | grep -Fxq \"$REQUESTED_MODEL\"; then SELECTED_MODEL=\"$REQUESTED_MODEL\"; else SELECTED_MODEL=\"$FALLBACK_MODEL\"; fi",
-    `"$OPENCODE_BIN" run --dir ${shellQuote(REGRESSION_DIR)} --model "$SELECTED_MODEL" ${shellQuote(prompt)}`,
+    "SELECTED_MODEL=\"$REQUESTED_MODEL\"",
+    "if ! printf '%s\\n' \"$AVAILABLE_MODELS\" | grep -Fxq \"$REQUESTED_MODEL\"; then SELECTED_MODEL=\"\"; fi",
+    "if [ -z \"$SELECTED_MODEL\" ]; then for CANDIDATE in $FALLBACK_MODELS; do if printf '%s\\n' \"$AVAILABLE_MODELS\" | grep -Fxq \"$CANDIDATE\"; then SELECTED_MODEL=\"$CANDIDATE\"; break; fi; done; fi",
+    "if [ -z \"$SELECTED_MODEL\" ]; then SELECTED_MODEL=\"$(printf '%s\\n' \"$AVAILABLE_MODELS\" | head -n 1)\"; fi",
+    `if command -v timeout >/dev/null 2>&1; then timeout 18m "$OPENCODE_BIN" run --dir ${shellQuote(REGRESSION_DIR)} --model "$SELECTED_MODEL" ${shellQuote(prompt)}; else "$OPENCODE_BIN" run --dir ${shellQuote(REGRESSION_DIR)} --model "$SELECTED_MODEL" ${shellQuote(prompt)}; fi`,
   ].join(" && ");
   return `${opencodeLookup}; if [ -n "$OPENCODE_BIN" ]; then ${runOpencode}; else echo "opencode not found" >&2; exit 1; fi`;
 }
@@ -213,8 +270,11 @@ function spawnBackgroundRun(meta: AgentRun, prompt: string) {
   const exitAbs = path.join(projectPaths.resultsDir, meta.exit_file);
   ensureDir(path.dirname(logAbs));
 
-  const testsModel = resolveTestsModel();
-  const agentCmd = buildAgentShellCommand(meta.target, prompt, testsModel);
+  const modelSelection = {
+    claude: resolveTestsClaudeModel(),
+    opencode: resolveTestsOpencodeModel(),
+  };
+  const agentCmd = buildAgentShellCommand(meta.target, prompt, modelSelection);
   const wrapped = `${agentCmd} > ${shellQuote(logAbs)} 2>&1; code=$?; echo $code > ${shellQuote(exitAbs)}`;
 
   const env = {
