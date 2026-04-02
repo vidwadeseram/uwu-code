@@ -53,7 +53,7 @@ export default function UnexposeModal({
         }}
       >
         <div
-          className="flex items-center justify-between px-5 py-4"
+          className="flex items-center justify-between px-4 sm:px-5 py-4"
           style={{ borderBottom: "1px solid #1e2d4a" }}
         >
           <div className="flex items-center gap-3">
@@ -89,6 +89,7 @@ export default function UnexposeModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="w-7 h-7 rounded flex items-center justify-center transition-colors"
             style={{ color: "#4a5568" }}
@@ -102,20 +103,20 @@ export default function UnexposeModal({
           </button>
         </div>
 
-        <div className="px-5 py-5 space-y-4">
+        <div className="px-4 sm:px-5 py-5 space-y-4">
           <div
             className="rounded-lg p-3 space-y-2"
             style={{ background: "rgba(30, 45, 74, 0.4)", border: "1px solid #1e2d4a" }}
           >
-            <div className="flex justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
               <span style={{ color: "#94a3b8" }}>Removing rule</span>
-              <span className="font-mono font-semibold" style={{ color: "#a855f7" }}>
+              <span className="font-mono font-semibold break-all" style={{ color: "#a855f7" }}>
                 ufw delete allow {port}/tcp
               </span>
             </div>
-            <div className="flex justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
               <span style={{ color: "#94a3b8" }}>Public URL</span>
-              <span className="font-mono text-xs" style={{ color: "#94a3b8" }}>
+              <span className="font-mono text-xs break-all" style={{ color: "#94a3b8" }}>
                 http://{publicIp}:{port}
               </span>
             </div>
@@ -154,10 +155,11 @@ export default function UnexposeModal({
         </div>
 
         <div
-          className="flex items-center justify-between gap-3 px-5 py-4"
+          className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4"
           style={{ borderTop: "1px solid #1e2d4a" }}
         >
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 rounded text-sm transition-colors"
             style={{
@@ -173,6 +175,7 @@ export default function UnexposeModal({
 
           {!result && (
             <button
+              type="button"
               onClick={onUnexpose}
               disabled={loading}
               className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-all"

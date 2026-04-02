@@ -80,7 +80,7 @@ export default function ExposeModal({
       >
         {/* Header */}
         <div
-          className="flex items-center justify-between px-5 py-4"
+          className="flex items-center justify-between px-4 sm:px-5 py-4"
           style={{ borderBottom: "1px solid #1e2d4a" }}
         >
           <div className="flex items-center gap-3">
@@ -115,6 +115,7 @@ export default function ExposeModal({
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
             className="w-7 h-7 rounded flex items-center justify-center transition-colors hover:bg-white/10"
             style={{ color: "#4a5568" }}
@@ -135,36 +136,36 @@ export default function ExposeModal({
         </div>
 
         {/* Body */}
-        <div className="px-5 py-5 space-y-4">
+        <div className="px-4 sm:px-5 py-5 space-y-4">
           {/* Port info */}
           <div
             className="rounded-lg p-3 space-y-2"
             style={{ background: "rgba(30, 45, 74, 0.4)", border: "1px solid #1e2d4a" }}
           >
-            <div className="flex justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
               <span style={{ color: "#94a3b8" }}>Port</span>
               <span className="font-mono font-semibold" style={{ color: "#00d4ff" }}>
                 {port.port}
               </span>
             </div>
-            <div className="flex justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
               <span style={{ color: "#94a3b8" }}>Process</span>
-              <span className="font-mono" style={{ color: "#e2e8f0" }}>
+              <span className="font-mono break-all" style={{ color: "#e2e8f0" }}>
                 {port.processName}
                 {port.pid ? ` (${port.pid})` : ""}
               </span>
             </div>
-            <div className="flex justify-between text-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
               <span style={{ color: "#94a3b8" }}>Address</span>
-              <span className="font-mono" style={{ color: "#e2e8f0" }}>
+              <span className="font-mono break-all" style={{ color: "#e2e8f0" }}>
                 {port.address}
               </span>
             </div>
             {port.matchedSession && (
-              <div className="flex justify-between text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
                 <span style={{ color: "#94a3b8" }}>Session</span>
                 <span
-                  className="font-mono"
+                  className="font-mono break-all"
                   style={{ color: "#00ff88" }}
                 >
                   {port.matchedSession}
@@ -193,6 +194,7 @@ export default function ExposeModal({
                 {previewUrl}
               </span>
               <button
+                type="button"
                 onClick={handleCopy}
                 className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all flex-shrink-0"
                 style={{
@@ -281,10 +283,11 @@ export default function ExposeModal({
 
         {/* Footer */}
         <div
-          className="flex items-center justify-between gap-3 px-5 py-4"
+          className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4"
           style={{ borderTop: "1px solid #1e2d4a" }}
         >
           <button
+            type="button"
             onClick={onClose}
             className="px-4 py-2 rounded text-sm transition-colors"
             style={{
@@ -300,6 +303,7 @@ export default function ExposeModal({
 
           {!result && (
             <button
+              type="button"
               onClick={onExpose}
               disabled={loading}
               className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-all"

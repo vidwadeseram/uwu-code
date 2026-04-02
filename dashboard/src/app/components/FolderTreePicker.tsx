@@ -289,12 +289,11 @@ export default function FolderTreePicker({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors"
+        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors w-full ${compact ? "sm:max-w-[260px]" : "sm:max-w-[360px]"}`}
         style={{
           background: "rgba(30,45,74,0.5)",
           color: value ? "#94a3b8" : "#4a5568",
           border: open ? "1px solid rgba(0,212,255,0.4)" : "1px solid #1e2d4a",
-          maxWidth: compact ? "260px" : "360px",
         }}
         title={value || placeholder}
       >
@@ -326,7 +325,7 @@ export default function FolderTreePicker({
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 z-50 w-80 rounded-lg overflow-hidden shadow-2xl"
+          className="absolute right-0 top-full mt-1 z-50 w-[min(20rem,calc(100vw-2rem))] sm:w-80 rounded-lg overflow-hidden shadow-2xl"
           style={{
             background: "#0f1629",
             border: "1px solid #1e2d4a",
