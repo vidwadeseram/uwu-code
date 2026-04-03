@@ -767,14 +767,14 @@ export async function generateWithCli(
   }
 
   const attemptErrors: string[] = [];
-  const cliTimeoutMs = target === "opencode" ? 180_000 : 240_000;
+  const cliTimeoutMs = target === "opencode" ? 120_000 : 180_000;
   const wrappedTimeout = target === "opencode";
   for (const command of candidates) {
     const envStrip = target === "opencode"
       ? ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_USERNAME", "OPENCODE_CLIENT"]
       : [];
 
-    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip, 60_000, wrappedTimeout);
+    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip, 10_000, wrappedTimeout);
     if (versionCheck.code !== 0) {
       const reason = versionCheck.stderr.trim() || versionCheck.stdout.trim() || versionCheck.errorMessage || "no output";
       attemptErrors.push(`${target} command '${command}' is not runnable: ${reason}`);
@@ -898,14 +898,14 @@ export async function generateSpecWithCli(
   }
 
   const attemptErrors: string[] = [];
-  const cliTimeoutMs = target === "opencode" ? 180_000 : 240_000;
+  const cliTimeoutMs = target === "opencode" ? 120_000 : 180_000;
   const wrappedTimeout = target === "opencode";
   for (const command of candidates) {
     const envStrip = target === "opencode"
       ? ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_USERNAME", "OPENCODE_CLIENT"]
       : [];
 
-    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip, 60_000, wrappedTimeout);
+    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip, 10_000, wrappedTimeout);
     if (versionCheck.code !== 0) {
       const reason = versionCheck.stderr.trim() || versionCheck.stdout.trim() || versionCheck.errorMessage || "no output";
       attemptErrors.push(`${target} command '${command}' is not runnable: ${reason}`);
