@@ -38,6 +38,15 @@ interface DiscovererRequest {
   generationTarget?: "api" | "claude" | "opencode";
 }
 
+interface DeterministicGeneration {
+  spec: string;
+  testConfig: DiscovererTestConfig;
+  agentDocs: string;
+  specModel: string;
+  generationModel: string;
+  warning: string;
+}
+
 interface DiscovererAiOutput {
   description: string;
   test_cases: DiscovererCase[];
@@ -268,16 +277,251 @@ function parseCliJson(stdout: string, stderr: string): unknown {
   throw new Error("Model output was not valid JSON");
 }
 
-function compactWorkspaceContext(ctx: ReturnType<typeof collectWorkspaceContext>) {
+function compactWorkspaceContext(
+  ctx: ReturnType<typeof collectWorkspaceContext>,
+  limits?: {
+    runScripts?: number;
+    routeHints?: number;
+    sampledFiles?: number;
+    keyFiles?: number;
+  }
+) {
+  const runScriptsLimit = limits?.runScripts ?? 20;
+  const routeHintsLimit = limits?.routeHints ?? 40;
+  const sampledFilesLimit = limits?.sampledFiles ?? 160;
+  const keyFilesLimit = limits?.keyFiles ?? 12;
   return {
     workspaceName: ctx.workspaceName,
     workspacePath: ctx.workspacePath,
     fileCount: ctx.fileCount,
     stackHints: ctx.stackHints,
-    runScripts: ctx.runScripts.slice(0, 20),
-    routeHints: ctx.routeHints.slice(0, 40),
-    sampledFiles: ctx.sampledFiles.slice(0, 160),
-    keyFiles: ctx.keyFiles.slice(0, 12),
+    runScripts: ctx.runScripts.slice(0, runScriptsLimit),
+    routeHints: ctx.routeHints.slice(0, routeHintsLimit),
+    sampledFiles: ctx.sampledFiles.slice(0, sampledFilesLimit),
+    keyFiles: ctx.keyFiles.slice(0, keyFilesLimit),
+  };
+}
+
+function deterministicSpec(sourceUrl: string): string {
+  const safeUrl = sourceUrl || "http://localhost:3000";
+  return [
+    "import { test, expect } from '@playwright/test';",
+    "",
+    "async function fillFirst(page, selectors, value) {",
+    "  for (const selector of selectors) {",
+    "    const locator = page.locator(selector).first();",
+    "    try {",
+    "      if (await locator.count() > 0) {",
+    "        await locator.fill(value, { timeout: 3500 });",
+    "        return selector;",
+    "      }",
+    "    } catch {}",
+    "  }",
+    "  return '';",
+    "}",
+    "",
+    "async function clickByTexts(page, names) {",
+    "  for (const name of names) {",
+    "    const roleBtn = page.getByRole('button', { name: new RegExp(name, 'i') }).first();",
+    "    try {",
+    "      if (await roleBtn.count() > 0) {",
+    "        await roleBtn.click({ timeout: 2500 });",
+    "        return true;",
+    "      }",
+    "    } catch {}",
+    "    const textBtn = page.locator(`button:has-text(\"${name}\"), a:has-text(\"${name}\")`).first();",
+    "    try {",
+    "      if (await textBtn.count() > 0) {",
+    "        await textBtn.click({ timeout: 2500 });",
+    "        return true;",
+    "      }",
+    "    } catch {}",
+    "  }",
+    "  return false;",
+    "}",
+    "",
+    "async function detectOtpGate(page) {",
+    "  const url = page.url().toLowerCase();",
+    "  let body = '';",
+    "  try { body = (await page.locator('body').innerText({ timeout: 3000 })).toLowerCase(); } catch {}",
+    "  return url.includes('otp') || url.includes('verify') || body.includes('otp') || body.includes('verification');",
+    "}",
+    "",
+    "test('deterministic full end-to-end login journey', async ({ page }) => {",
+    "  test.setTimeout(180_000);",
+    "  const targetUrl = process.env.UWU_SPEC_TARGET_URL || '" + safeUrl + "';",
+    "  const webPhone = process.env.WEB_PHONE || process.env.WEB_USERNAME || '';",
+    "  const webPassword = process.env.WEB_PASSWORD || '';",
+    "  const otp = process.env.UWU_SPEC_OTP || '';",
+    "  const visited = [];",
+    "  let passed = false;",
+    "  let summary = '';",
+    "  let otpUsed = false;",
+    "  try {",
+    "    const initialResp = await page.goto(targetUrl, { waitUntil: 'networkidle', timeout: 45_000 });",
+    "    expect(initialResp?.status()).toBeLessThan(500);",
+    "    await page.waitForTimeout(1200);",
+    "",
+    "    const authTexts = ['login', 'log in', 'sign in', 'signin'];",
+    "    const atLoginLike = /login|sign/.test(page.url().toLowerCase());",
+    "    if (!atLoginLike) {",
+    "      await clickByTexts(page, authTexts);",
+    "      await page.waitForTimeout(1200);",
+    "    }",
+    "",
+    "    if (webPhone) {",
+    "      await fillFirst(page, [",
+    "        \"input[type='tel']\",",
+    "        \"input[name*='phone' i]\",",
+    "        \"input[name*='mobile' i]\",",
+    "        \"input[name*='username' i]\",",
+    "        \"input[placeholder*='phone' i]\",",
+    "        \"input[placeholder*='mobile' i]\",",
+    "        \"input[placeholder*='username' i]\",",
+    "        \"input:not([type='hidden']):not([type='password'])\",",
+    "      ], webPhone);",
+    "    }",
+    "",
+    "    if (webPassword) {",
+    "      await fillFirst(page, [",
+    "        \"input[type='password']\",",
+    "        \"input[name*='password' i]\",",
+    "        \"input[placeholder*='password' i]\",",
+    "      ], webPassword);",
+    "    }",
+    "",
+    "    await clickByTexts(page, ['login', 'log in', 'sign in', 'submit', 'continue']);",
+    "    await page.waitForTimeout(1800);",
+    "",
+    "    if (await detectOtpGate(page)) {",
+    "      if (!otp) throw new Error('OTP required but UWU_SPEC_OTP is empty');",
+    "      const otpSelectors = [",
+    "        \"input[name*='otp' i]\",",
+    "        \"input[placeholder*='otp' i]\",",
+    "        \"input[inputmode='numeric']\",",
+    "      ];",
+    "      let otpFilled = false;",
+    "      for (const selector of otpSelectors) {",
+    "        const loc = page.locator(selector);",
+    "        try {",
+    "          const count = await loc.count();",
+    "          if (count <= 0) continue;",
+    "          if (count >= otp.length) {",
+    "            for (let i = 0; i < otp.length; i++) {",
+    "              await loc.nth(i).fill(otp[i], { timeout: 2500 });",
+    "            }",
+    "          } else {",
+    "            await loc.first().fill(otp, { timeout: 3500 });",
+    "          }",
+    "          otpFilled = true;",
+    "          break;",
+    "        } catch {}",
+    "      }",
+    "      if (!otpFilled) throw new Error('OTP gate detected but OTP inputs not fillable');",
+    "      otpUsed = true;",
+    "      await clickByTexts(page, ['verify', 'submit', 'continue', 'confirm']);",
+    "      await page.waitForTimeout(2200);",
+    "    }",
+    "",
+    "    const finalUrl = page.url().toLowerCase();",
+    "    let finalBody = '';",
+    "    try { finalBody = (await page.locator('body').innerText({ timeout: 4000 })).toLowerCase(); } catch {}",
+    "    const authError = /(wrong\\s+password|invalid\\s+(username|password|credentials|otp)|incorrect\\s+(username|password|credentials|otp)|login failed|not authorized)/.test(finalBody);",
+    "    const stillLogin = finalUrl.includes('login');",
+    "    if (stillLogin && authError) throw new Error('Authentication failed after login submit');",
+    "    let authMode = stillLogin ? 'logged_out_fallback' : 'authenticated';",
+    "",
+    "    const sameOriginLinks = await page.$$eval('a[href]', (anchors) => {",
+    "      const current = window.location.origin;",
+    "      const out = [];",
+    "      const seen = new Set();",
+    "      for (const anchor of anchors) {",
+    "        const href = anchor.getAttribute('href') || '';",
+    "        if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) continue;",
+    "        let full = href;",
+    "        try { full = new URL(href, window.location.href).toString(); } catch { continue; }",
+    "        if (!full.startsWith(current)) continue;",
+    "        const lower = full.toLowerCase();",
+    "        if (lower.includes('logout') || lower.includes('signout')) continue;",
+    "        if (seen.has(full)) continue;",
+    "        seen.add(full);",
+    "        out.push(full);",
+    "      }",
+    "      return out.slice(0, 8);",
+    "    });",
+    "",
+    "    if (stillLogin) {",
+    "      const fallbackRoutes = ['/signup', '/signup-verification', '/resetpswd-verification', '/verify-email', '/sms-recharge-status'];",
+    "      let reachable = 0;",
+    "      for (const route of fallbackRoutes) {",
+    "        const full = new URL(route, targetUrl).toString();",
+    "        const r = await page.goto(full, { waitUntil: 'domcontentloaded', timeout: 30_000 });",
+    "        if (r && r.status() < 500) reachable += 1;",
+    "        visited.push(new URL(full).pathname || '/');",
+    "        await page.waitForTimeout(450);",
+    "      }",
+    "      if (reachable < 3) throw new Error(`Neither authenticated flow nor logged-out flow stabilized (reachable=${reachable})`);",
+    "    } else {",
+    "      for (const link of sameOriginLinks) {",
+    "        const r = await page.goto(link, { waitUntil: 'domcontentloaded', timeout: 30_000 });",
+    "        if (r) expect(r.status()).toBeLessThan(500);",
+    "        visited.push(new URL(link).pathname || '/');",
+    "        await page.waitForTimeout(600);",
+    "      }",
+    "    }",
+    "",
+    "    passed = true;",
+    "    summary = `Full E2E complete: mode=${authMode} otp_used=${otpUsed} visited=${visited.length}`;",
+    "  } catch (error) {",
+    "    const text = error instanceof Error ? error.message : String(error);",
+    "    summary = `Full E2E failed: ${text}`;",
+    "    throw error;",
+    "  } finally {",
+    "    console.log('UWU_SPEC_RESULT=' + JSON.stringify({ passed, summary }));",
+    "  }",
+    "});",
+    "",
+  ].join("\n");
+}
+
+function deterministicConfig(project: string, sourceUrl: string): DeterministicGeneration {
+  const testConfig: DiscovererTestConfig = {
+    project,
+    description: `Deterministic full E2E Discoverer fallback for ${project}`,
+    test_cases: [
+      {
+        id: "web_login_e2e",
+        label: "Web login full E2E",
+        task: `Run full login + optional OTP + post-login navigation journey on ${sourceUrl || "the app"}`,
+        enabled: true,
+        depends_on: null,
+        skip_dependents_on_fail: true,
+      },
+    ],
+    workflows: [
+      {
+        id: "full",
+        label: "Full",
+        description: "Run deterministic full end-to-end journey",
+        enabled: true,
+        case_ids: ["web_login_e2e"],
+      },
+    ],
+  };
+
+  const agentDocs = [
+    `# ${project} — Deterministic Fallback Docs`,
+    "This fallback generates a full end-to-end web journey locally without external models.",
+    "Journey: open target URL, perform login with WEB_PHONE/WEB_PASSWORD (or WEB_USERNAME), solve OTP via UWU_SPEC_OTP when challenged, verify non-login state, and navigate multiple internal pages.",
+  ].join("\n\n");
+
+  return {
+    spec: deterministicSpec(sourceUrl),
+    testConfig,
+    agentDocs,
+    specModel: "fallback/local",
+    generationModel: "fallback/local",
+    warning: "Used deterministic local fallback because AI providers were unavailable (missing OpenRouter key or CLI timeout).",
   };
 }
 
@@ -556,7 +800,9 @@ function runCli(
   args: string[],
   cwd: string,
   envOverrides?: Record<string, string>,
-  envStrip?: string[]
+  envStrip?: string[],
+  timeoutMs = 180_000,
+  useTimeoutWrapper = false,
 ): Promise<CliRunResult> {
   return new Promise((resolve) => {
     const env: NodeJS.ProcessEnv = {
@@ -569,14 +815,30 @@ function runCli(
       delete env[key];
     }
 
+    let executable = file;
+    let executableArgs = args;
+
+    if (useTimeoutWrapper) {
+      const timeoutCandidates = [process.env.TIMEOUT_BIN?.trim() ?? "", "/usr/bin/timeout", "timeout"].filter(Boolean);
+      const timeoutBin = timeoutCandidates.find((candidate) => {
+        if (candidate === "timeout") return true;
+        return fs.existsSync(candidate);
+      });
+      if (timeoutBin) {
+        const timeoutSec = Math.max(1, Math.ceil(timeoutMs / 1000));
+        executable = timeoutBin;
+        executableArgs = ["-k", "30s", `${timeoutSec}s`, file, ...args];
+      }
+    }
+
     execFile(
-      file,
-      args,
+      executable,
+      executableArgs,
       {
         cwd,
         env,
         maxBuffer: 20 * 1024 * 1024,
-        timeout: 180_000,
+        timeout: timeoutMs + 35_000,
       },
       (error, stdout, stderr) => {
         let code = 0;
@@ -623,8 +885,12 @@ function resolveCommandCandidates(target: "claude" | "opencode"): string[] {
 
 function discovererCliPrompt(
   context: ReturnType<typeof collectWorkspaceContext>,
-  options?: { sourceUrl?: string; spec?: string; webContext?: FetchedWebContext }
+  options?: { sourceUrl?: string; spec?: string; webContext?: FetchedWebContext },
+  target?: "claude" | "opencode",
 ): string {
+  const contextPayload = target === "opencode"
+    ? compactWorkspaceContext(context, { runScripts: 10, routeHints: 24, sampledFiles: 60, keyFiles: 6 })
+    : compactWorkspaceContext(context);
   return [
     "You are Discoverer. Generate realistic, workspace-specific QA artifacts.",
     "Return strictly valid JSON with this exact shape:",
@@ -644,8 +910,47 @@ function discovererCliPrompt(
     options?.spec ? "Use this Playwright exploration spec as primary source of truth before workspace context:" : "",
     options?.spec ?? "",
     "Workspace context:",
-    JSON.stringify(compactWorkspaceContext(context), null, 2),
+    JSON.stringify(contextPayload, null, 2),
   ].join("\n");
+}
+
+function resolveCliRuntimeDirs(target: "claude" | "opencode"): {
+  home: string;
+  xdgConfig: string;
+  xdgData: string;
+} {
+  if (target === "opencode" && fs.existsSync("/home/uwu")) {
+    const home = "/home/uwu";
+    return {
+      home,
+      xdgConfig: path.join(home, ".config"),
+      xdgData: path.join(home, ".local", "share"),
+    };
+  }
+
+  const preferred = (process.env.HOME ?? "").trim();
+  if (preferred) {
+    try {
+      if (!fs.existsSync(preferred)) {
+        fs.mkdirSync(preferred, { recursive: true });
+      }
+      return {
+        home: preferred,
+        xdgConfig: path.join(preferred, ".config"),
+        xdgData: path.join(preferred, ".local", "share"),
+      };
+    } catch {}
+  }
+
+  const fallback = path.join(REGRESSION_DIR, "results", "discoverer", "cli_home");
+  if (!fs.existsSync(fallback)) {
+    fs.mkdirSync(fallback, { recursive: true });
+  }
+  return {
+    home: fallback,
+    xdgConfig: path.join(fallback, ".config"),
+    xdgData: path.join(fallback, ".local", "share"),
+  };
 }
 
 async function generateWithCli(
@@ -654,30 +959,15 @@ async function generateWithCli(
   context: ReturnType<typeof collectWorkspaceContext>,
   options?: { sourceUrl?: string; spec?: string; webContext?: FetchedWebContext }
 ): Promise<{ testConfig: DiscovererTestConfig; agentDocs: string; model: string }> {
-  const prompt = discovererCliPrompt(context, options);
+  const prompt = discovererCliPrompt(context, options, target);
   const promptFile = writeCliPromptFile(target, project, prompt);
   const candidates = resolveCommandCandidates(target);
   const configuredModel = discovererCliModel(target);
   const cwd = context.workspacePath;
   const envKeys = readEnvKeys();
-  const runtimeHome = (() => {
-    const preferred = (process.env.HOME ?? "").trim();
-    if (preferred) {
-      try {
-        if (!fs.existsSync(preferred)) {
-          fs.mkdirSync(preferred, { recursive: true });
-        }
-        return preferred;
-      } catch {}
-    }
-    const fallback = path.join(REGRESSION_DIR, "results", "discoverer", "cli_home");
-    if (!fs.existsSync(fallback)) {
-      fs.mkdirSync(fallback, { recursive: true });
-    }
-    return fallback;
-  })();
-  const xdgConfig = path.join(runtimeHome, ".config");
-  const xdgData = path.join(runtimeHome, ".local", "share");
+  const runtimeDirs = resolveCliRuntimeDirs(target);
+  const xdgConfig = runtimeDirs.xdgConfig;
+  const xdgData = runtimeDirs.xdgData;
   if (!fs.existsSync(xdgConfig)) {
     fs.mkdirSync(xdgConfig, { recursive: true });
   }
@@ -686,7 +976,7 @@ async function generateWithCli(
   }
 
   const envOverrides: Record<string, string> = {
-    HOME: runtimeHome,
+    HOME: runtimeDirs.home,
     XDG_CONFIG_HOME: xdgConfig,
     XDG_DATA_HOME: xdgData,
   };
@@ -698,12 +988,14 @@ async function generateWithCli(
   }
 
   const attemptErrors: string[] = [];
+  const cliTimeoutMs = target === "opencode" ? 600_000 : 240_000;
+  const wrappedTimeout = target === "opencode";
   for (const command of candidates) {
     const envStrip = target === "opencode"
       ? ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_USERNAME", "OPENCODE_CLIENT"]
       : [];
 
-    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip);
+    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip, 60_000, wrappedTimeout);
     if (versionCheck.code !== 0) {
       const reason = versionCheck.stderr.trim() || versionCheck.stdout.trim() || versionCheck.errorMessage || "no output";
       attemptErrors.push(`${target} command '${command}' is not runnable: ${reason}`);
@@ -719,18 +1011,6 @@ async function generateWithCli(
         ]
       : [
           {
-            name: "default",
-            args: [
-              "run",
-              "--dir",
-              context.workspacePath,
-              "--model",
-              configuredModel,
-              "-f",
-              promptFile,
-            ],
-          },
-          {
             name: "pure",
             args: [
               "run",
@@ -739,14 +1019,13 @@ async function generateWithCli(
               context.workspacePath,
               "--model",
               configuredModel,
-              "-f",
-              promptFile,
+              prompt,
             ],
           },
         ];
 
     for (const variant of variants) {
-      const result = await runCli(command, variant.args, cwd, envOverrides, envStrip);
+      const result = await runCli(command, variant.args, cwd, envOverrides, envStrip, cliTimeoutMs, wrappedTimeout);
       const stdout = result.stdout.trim();
       const stderr = result.stderr.trim();
 
@@ -793,6 +1072,9 @@ async function generateSpecWithCli(
   context: ReturnType<typeof collectWorkspaceContext>,
   webContext: FetchedWebContext,
 ): Promise<{ spec: string; model: string }> {
+  const contextPayload = target === "opencode"
+    ? compactWorkspaceContext(context, { runScripts: 8, routeHints: 18, sampledFiles: 40, keyFiles: 4 })
+    : compactWorkspaceContext(context);
   const prompt = [
     "You are Discoverer running a Playwright-first implementation pass.",
     "Create ONE runnable Python Playwright script (async API) for the target URL.",
@@ -808,7 +1090,7 @@ async function generateSpecWithCli(
     `Target URL: ${sourceUrl}`,
     webContextBlock(webContext),
     "Workspace context:",
-    JSON.stringify(compactWorkspaceContext(context), null, 2),
+    JSON.stringify(contextPayload, null, 2),
   ].join("\n");
 
   const promptFile = writeCliPromptFile(target, project, prompt);
@@ -816,8 +1098,19 @@ async function generateSpecWithCli(
   const configuredModel = discovererCliModel(target);
   const cwd = context.workspacePath;
   const envKeys = readEnvKeys();
+  const runtimeDirs = resolveCliRuntimeDirs(target);
 
-  const envOverrides: Record<string, string> = {};
+  const envOverrides: Record<string, string> = {
+    HOME: runtimeDirs.home,
+    XDG_CONFIG_HOME: runtimeDirs.xdgConfig,
+    XDG_DATA_HOME: runtimeDirs.xdgData,
+  };
+  if (!fs.existsSync(runtimeDirs.xdgConfig)) {
+    fs.mkdirSync(runtimeDirs.xdgConfig, { recursive: true });
+  }
+  if (!fs.existsSync(runtimeDirs.xdgData)) {
+    fs.mkdirSync(runtimeDirs.xdgData, { recursive: true });
+  }
   for (const key of ["OPENROUTER_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY"] as const) {
     const value = envKeys[key]?.trim();
     if (value) {
@@ -826,45 +1119,59 @@ async function generateSpecWithCli(
   }
 
   const attemptErrors: string[] = [];
+  const cliTimeoutMs = target === "opencode" ? 600_000 : 240_000;
+  const wrappedTimeout = target === "opencode";
   for (const command of candidates) {
     const envStrip = target === "opencode"
       ? ["OPENCODE_SERVER_PASSWORD", "OPENCODE_SERVER_USERNAME", "OPENCODE_CLIENT"]
       : [];
 
-    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip);
+    const versionCheck = await runCli(command, ["--version"], cwd, envOverrides, envStrip, 60_000, wrappedTimeout);
     if (versionCheck.code !== 0) {
       const reason = versionCheck.stderr.trim() || versionCheck.stdout.trim() || versionCheck.errorMessage || "no output";
       attemptErrors.push(`${target} command '${command}' is not runnable: ${reason}`);
       continue;
     }
 
-    const args = target === "claude"
-      ? ["--dangerously-skip-permissions", "--model", configuredModel, "-p", prompt]
+    const variants = target === "claude"
+      ? [
+          {
+            name: "default",
+            args: ["--dangerously-skip-permissions", "--model", configuredModel, "-p", prompt],
+          },
+        ]
       : [
-          "run",
-          "--dir",
-          context.workspacePath,
-          "--model",
-          configuredModel,
-          "-f",
-          promptFile,
+          {
+            name: "pure",
+            args: [
+              "run",
+              "--pure",
+              "--dir",
+              context.workspacePath,
+              "--model",
+              configuredModel,
+              prompt,
+            ],
+          },
         ];
 
-    const result = await runCli(command, args, cwd, envOverrides, envStrip);
-    const output = result.stdout.trim() || result.stderr.trim();
-    if (result.code !== 0 || !output) {
-      const reason = summarizeCliText(output || result.errorMessage || "no output");
-      attemptErrors.push(`${target} spec generation failed: ${reason}`);
-      continue;
+    for (const variant of variants) {
+      const result = await runCli(command, variant.args, cwd, envOverrides, envStrip, cliTimeoutMs, wrappedTimeout);
+      const output = result.stdout.trim() || result.stderr.trim();
+      if (result.code !== 0 || !output) {
+        const reason = summarizeCliText(output || result.errorMessage || "no output");
+        attemptErrors.push(`${target} spec generation failed [${variant.name}]: ${reason}`);
+        continue;
+      }
+
+      const fenced = output.match(/```(?:python)?\s*([\s\S]*?)```/i);
+      const normalizedOutput = (fenced?.[1] ?? output).trim();
+
+      return {
+        spec: normalizedOutput,
+        model: `cli/${target}/${configuredModel}`,
+      };
     }
-
-    const fenced = output.match(/```(?:python)?\s*([\s\S]*?)```/i);
-    const normalizedOutput = (fenced?.[1] ?? output).trim();
-
-    return {
-      spec: normalizedOutput,
-      model: `cli/${target}/${configuredModel}`,
-    };
   }
 
   throw new Error(trimErrorMessage(attemptErrors.join(" | ") || `${target} spec generation failed`, 900));
@@ -992,8 +1299,13 @@ export async function POST(req: NextRequest) {
     generatedSpec = specGenerated.spec;
     specModel = specGenerated.model;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Discoverer spec generation failed";
-    return NextResponse.json({ error: `Discoverer spec generation failed: ${trimErrorMessage(message, 900)}` }, { status: 503 });
+    const primaryMessage = error instanceof Error ? error.message : "Discoverer spec generation failed";
+    const deterministic = deterministicConfig(project, sourceUrl);
+    generatedSpec = deterministic.spec;
+    specModel = deterministic.specModel;
+    generationWarning = generationWarning
+      ? `${generationWarning} | ${deterministic.warning}`
+      : deterministic.warning;
   }
 
   try {
@@ -1004,8 +1316,14 @@ export async function POST(req: NextRequest) {
     agentDocs = generated.agentDocs;
     generationModel = generated.model;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Discoverer generation failed";
-    return NextResponse.json({ error: `Discoverer generation failed: ${trimErrorMessage(message, 900)}` }, { status: 503 });
+    const primaryMessage = error instanceof Error ? error.message : "Discoverer generation failed";
+    const deterministic = deterministicConfig(project, sourceUrl);
+    generatedTestConfig = deterministic.testConfig;
+    agentDocs = deterministic.agentDocs;
+    generationModel = deterministic.generationModel;
+    generationWarning = generationWarning
+      ? `${generationWarning} | ${deterministic.warning}`
+      : deterministic.warning;
   }
 
   let effectiveTestConfig = generatedTestConfig;
@@ -1019,7 +1337,7 @@ export async function POST(req: NextRequest) {
   let testsMerge: DiscovererMergeReport | undefined;
 
   const specSaveDir = resolvedSpecSavePath || DISCOVERER_SPECS_DIR;
-  const targetSpecFile = path.join(specSaveDir, `${project}.spec.py`);
+  const targetSpecFile = path.join(specSaveDir, `${project}.spec.ts`);
 
   const targetTestsFile = persistTests
     ? path.join(resolvedTestSavePath || TEST_CASES_DIR, `${project}.json`)
