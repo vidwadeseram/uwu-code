@@ -36,6 +36,7 @@ class SchedulerClient:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "X-Agent-Source": "openclaw",
         }
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
@@ -127,6 +128,20 @@ class SchedulerClient:
         log.info(f"PATCH /api/scheduler/tasks/{task_id} action=queue_now")
         return self.update_task(task_id, {"action": "queue_now"})
 
+    def ensure_agent_key(self) -> None:
+        if self.api_key:
+            return
+        try:
+            response = self._client.get(f"{self.base_url}/api/settings/agent-key")
+            if response.status_code == 200:
+                data = response.json()
+                self.api_key = data.get("agent_api_key", "")
+                log.info("Retrieved agent API key from dashboard")
+            else:
+                log.warning(f"Failed to get agent API key: {response.status_code}")
+        except Exception as e:
+            log.warning(f"Could not retrieve agent API key: {e}")
+
     def close(self) -> None:
         self._client.close()
 
@@ -144,4 +159,5 @@ def get_api_client() -> SchedulerClient:
     global _api_client
     if _api_client is None:
         _api_client = SchedulerClient()
+        _api_client.ensure_agent_key()
     return _api_client

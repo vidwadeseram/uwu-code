@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken } from "@/app/lib/auth-token";
+import { readSettings } from "@/app/lib/settings";
 
 const LOGIN_PATH = "/login";
 const PUBLIC_API_PATHS = new Set([
@@ -9,8 +10,24 @@ const PUBLIC_API_PATHS = new Set([
 
 const INTERNAL_SECRET = process.env.AUTH_SECRET?.trim();
 
+async function isAgentAuthenticated(request: NextRequest): Promise<boolean> {
+  if (request.headers.get("x-agent-source") !== "openclaw") {
+    return false;
+  }
+  const authHeader = request.headers.get("authorization") || "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return false;
+  }
+  const token = authHeader.slice(7);
+  const settings = readSettings();
+  return token === settings.agent_api_key && settings.agent_api_key !== "";
+}
+
 async function isAuthenticated(request: NextRequest): Promise<boolean> {
   if (INTERNAL_SECRET && request.headers.get("x-internal-secret") === INTERNAL_SECRET) {
+    return true;
+  }
+  if (await isAgentAuthenticated(request)) {
     return true;
   }
   const token = request.cookies.get("uwu_session")?.value;

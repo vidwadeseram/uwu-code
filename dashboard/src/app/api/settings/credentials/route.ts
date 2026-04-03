@@ -29,7 +29,8 @@ export async function POST(req: NextRequest) {
   writeSettings({
     username: username.trim(),
     password_hash: hashPassword(password),
-    session_token: generateToken(), // invalidate all existing sessions
+    session_token: generateToken(),
+    agent_api_key: settings.agent_api_key,
   });
 
   // Clear cookie so user must re-login
@@ -40,7 +41,8 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   if (!(await checkAuth(req))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  writeSettings({ username: "", password_hash: "", session_token: "" });
+  const settings = readSettings();
+  writeSettings({ username: "", password_hash: "", session_token: "", agent_api_key: settings.agent_api_key });
   const res = NextResponse.json({ ok: true });
   res.cookies.delete("uwu_session");
   return res;

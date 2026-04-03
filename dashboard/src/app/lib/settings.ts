@@ -11,6 +11,7 @@ export interface Settings {
   username: string;
   password_hash: string;
   session_token: string;
+  agent_api_key: string;
   models?: {
     openclaw?: string;
   };
@@ -18,11 +19,11 @@ export interface Settings {
 
 export function readSettings(): Settings {
   if (!fs.existsSync(SETTINGS_FILE))
-    return { username: "", password_hash: "", session_token: "" };
+    return { username: "", password_hash: "", session_token: "", agent_api_key: "" };
   try {
     return JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf-8"));
   } catch {
-    return { username: "", password_hash: "", session_token: "" };
+    return { username: "", password_hash: "", session_token: "", agent_api_key: "" };
   }
 }
 
