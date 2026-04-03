@@ -272,6 +272,93 @@ def create_template_task(
     )
 
 
+# ── task editing helpers ──────────────────────────────────────────────────────
+
+MUTABLE_FIELDS = {
+    "title", "description", "status", "schedule_mode",
+    "schedule_time", "schedule_weekday", "preferred_tool", "workspace",
+}
+
+
+def update_existing_task(
+    task_id: str,
+    updates: dict[str, Any],
+    use_api: bool = True,
+) -> dict[str, Any] | None:
+    invalid_fields = [k for k in updates.keys() if k not in MUTABLE_FIELDS]
+    if invalid_fields:
+        log(f"update_existing_task: invalid fields {invalid_fields}")
+        return None
+
+    if use_api:
+        try:
+            from api_client import get_api_client
+            client = get_api_client()
+            task = client.update_task(task_id, updates)
+            log(f"Updated task {task_id} via API: {list(updates.keys())}")
+            return task
+        except Exception as e:
+            log(f"Failed to update task via API: {e}")
+            return None
+
+    tasks = load_tasks()
+    for i, t in enumerate(tasks):
+        if t.get("id") == task_id:
+            log(f"Updating task {task_id}: {list(updates.keys())}")
+            tasks[i].update(updates)
+            save_tasks(tasks)
+            return tasks[i]
+    log(f"Task {task_id} not found")
+    return None
+
+
+def reschedule_task(
+    task_id: str,
+    schedule_mode: str = "anytime",
+    schedule_time: str | None = None,
+    schedule_weekday: int | None = None,
+    one_time_at: str | None = None,
+) -> dict[str, Any] | None:
+    updates: dict[str, Any] = {"schedule_mode": schedule_mode}
+    if schedule_time is not None:
+        updates["schedule_time"] = schedule_time
+    if schedule_weekday is not None:
+        updates["schedule_weekday"] = schedule_weekday
+    if one_time_at is not None:
+        updates["scheduled_at"] = one_time_at
+        updates["status"] = "scheduled"
+    log(f"Rescheduling task {task_id} to {schedule_mode}")
+    return update_existing_task(task_id, updates)
+
+
+def cancel_task(task_id: str) -> dict[str, Any] | None:
+    log(f"Cancelling task {task_id}")
+    return update_existing_task(task_id, {"status": "cancelled"})
+
+
+def postpone_task(task_id: str, hours: int = 1) -> dict[str, Any] | None:
+    from datetime import timedelta
+    next_run = datetime.now(timezone.utc) + timedelta(hours=hours)
+    iso_time = next_run.isoformat()
+    log(f"Postponing task {task_id} by {hours}h to {iso_time}")
+    return update_existing_task(task_id, {
+        "status": "scheduled",
+        "scheduled_at": iso_time,
+    })
+
+
+def update_task_description(task_id: str, description: str) -> dict[str, Any] | None:
+    return update_existing_task(task_id, {"description": description})
+
+
+def update_task_status(task_id: str, status: str) -> dict[str, Any] | None:
+    valid_statuses = {"pending", "running", "completed", "failed", "scheduled", "manual", "cancelled"}
+    if status not in valid_statuses:
+        log(f"Invalid status: {status}")
+        return None
+    return update_existing_task(task_id, {"status": status})
+
+
 # ── scheduling ────────────────────────────────────────────────────────────────
 
 RATE_LIMIT_PHRASES = [
