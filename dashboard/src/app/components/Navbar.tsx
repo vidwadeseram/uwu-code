@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ThemeToggle } from "@/components/theme/ThemeSelector";
 
 interface SystemInfo {
   publicIp: string;
@@ -194,6 +195,7 @@ export default function Navbar() {
             <div className="px-1.5 sm:px-2 py-0.5 rounded font-mono text-xs" style={{ background: "rgba(30,45,74,0.5)", color: "#ffd700", minWidth: "54px", textAlign: "center" }}>
               {currentTime}
             </div>
+            <ThemeToggle />
 
             {/* Mobile menu button */}
             <button
