@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { sessions, killSessionProcess } from "@/lib/terminal-sessions";
+import { sessions, killSession } from "@/lib/terminal-sessions";
 
 export async function DELETE(
   request: NextRequest,
@@ -12,7 +12,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
-  killSessionProcess(session);
+  killSession(session);
   sessions.delete(id);
 
   return NextResponse.json({ success: true });

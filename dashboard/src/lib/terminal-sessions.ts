@@ -1,36 +1,41 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
+import { randomUUID } from "crypto";
 
-const BASE_PORT = 7682;
 const MAX_SESSIONS = 10;
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 export interface TerminalSession {
   id: string;
-  port: number;
-  pid: number;
+  tmuxSession: string;
   createdAt: number;
   lastActivity: number;
 }
 
 export const sessions = new Map<string, TerminalSession>();
 
-export function findAvailablePort(startPort: number): number {
-  let port = startPort;
-  const usedPorts = new Set(Array.from(sessions.values()).map((s) => s.port));
-  while (usedPorts.has(port) && port < startPort + 100) {
-    port++;
+function runCommand(cmd: string): string {
+  try {
+    return execSync(cmd, { encoding: "utf-8", timeout: 5000 }).trim();
+  } catch {
+    return "";
   }
-  return port;
 }
 
-export function killSessionProcess(session: TerminalSession) {
-  try {
-    process.kill(session.pid, "SIGTERM");
-  } catch {
-    try {
-      process.kill(session.pid, "SIGKILL");
-    } catch {}
-  }
+function killTmuxSession(sessionName: string) {
+  runCommand(`tmux kill-session -t "${sessionName}" 2>/dev/null || true`);
+}
+
+export function createTmuxSession(id: string): TerminalSession {
+  const tmuxSession = `uwu-${id.slice(0, 8)}`;
+  
+  runCommand(`tmux new-session -d -s "${tmuxSession}" -c /opt/workspaces 2>/dev/null || true`);
+  
+  return {
+    id,
+    tmuxSession,
+    createdAt: Date.now(),
+    lastActivity: Date.now(),
+  };
 }
 
 export function cleanupIdleSessions() {
@@ -44,10 +49,21 @@ export function cleanupIdleSessions() {
   toDelete.forEach((id) => {
     const session = sessions.get(id);
     if (session) {
-      killSessionProcess(session);
+      killTmuxSession(session.tmuxSession);
       sessions.delete(id);
     }
   });
+}
+
+export function killSession(session: TerminalSession) {
+  killTmuxSession(session.tmuxSession);
+}
+
+export function updateSessionActivity(id: string) {
+  const session = sessions.get(id);
+  if (session) {
+    session.lastActivity = Date.now();
+  }
 }
 
 let cleanupInterval: NodeJS.Timeout | null = null;
@@ -55,27 +71,6 @@ let cleanupInterval: NodeJS.Timeout | null = null;
 export function startSessionCleanup() {
   if (cleanupInterval) return;
   cleanupInterval = setInterval(cleanupIdleSessions, 60 * 1000);
-}
-
-export function createTtydSession(id: string, port: number): TerminalSession {
-  const ttydBin = process.env.TTYD_BIN || "/usr/local/bin/ttyd";
-  const workingDir = process.env.TERMINAL_WORKDIR || "/opt/workspaces";
-
-  const child = spawn(ttydBin, ["-p", String(port), "-w", "/bin/bash", "-l"], {
-    cwd: workingDir,
-    stdio: "ignore",
-    detached: true,
-  });
-  const pid = child.pid!;
-  child.unref();
-
-  return {
-    id,
-    port,
-    pid,
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-  };
 }
 
 export { MAX_SESSIONS };

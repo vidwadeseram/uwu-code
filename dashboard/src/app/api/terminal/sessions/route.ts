@@ -2,20 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import {
   sessions,
-  findAvailablePort,
-  createTtydSession,
+  createTmuxSession,
   startSessionCleanup,
+  updateSessionActivity,
+  killSession,
   MAX_SESSIONS,
 } from "@/lib/terminal-sessions";
-
-const BASE_PORT = 7682;
 
 startSessionCleanup();
 
 export async function GET() {
   const sessionList = Array.from(sessions.values()).map((s) => ({
     id: s.id,
-    port: s.port,
+    tmuxSession: s.tmuxSession,
     createdAt: s.createdAt,
     lastActivity: s.lastActivity,
   }));
@@ -31,14 +30,23 @@ export async function POST(request: NextRequest) {
   }
 
   const id = randomUUID();
-  const port = findAvailablePort(BASE_PORT);
-
-  const session = createTtydSession(id, port);
+  const session = createTmuxSession(id);
   sessions.set(id, session);
 
   return NextResponse.json({
     id,
-    port,
-    wsUrl: `/terminal/${id}/`,
+    tmuxSession: session.tmuxSession,
   });
+}
+
+export async function PATCH(request: NextRequest) {
+  const body = await request.json();
+  const { id } = body as { id?: string };
+  
+  if (id && sessions.has(id)) {
+    updateSessionActivity(id);
+    return NextResponse.json({ success: true });
+  }
+  
+  return NextResponse.json({ error: "Session not found" }, { status: 404 });
 }
