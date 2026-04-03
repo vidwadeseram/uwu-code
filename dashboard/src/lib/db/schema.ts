@@ -77,6 +77,8 @@ export const kanbanTickets = sqliteTable("kanban_tickets", {
   assignee: text("assignee"),
   labels: text("labels"),
   dueDate: integer("due_date", { mode: "timestamp" }),
+  sourceId: text("source_id"),
+  sourceProvider: text("source_provider"),
   createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
 });
