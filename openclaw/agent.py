@@ -359,6 +359,111 @@ def update_task_status(task_id: str, status: str) -> dict[str, Any] | None:
     return update_existing_task(task_id, {"status": status})
 
 
+# ── task chaining helpers ─────────────────────────────────────────────────────
+
+CHAIN_WORKFLOWS: dict[str, list[dict[str, Any]]] = {
+    "code_test_deploy": [
+        {"type": "coding", "description": "Write and implement code changes", "preferred_tool": "auto"},
+        {"type": "coding", "description": "Run tests and verify functionality", "preferred_tool": "auto"},
+        {"type": "coding", "description": "Deploy changes to target environment", "preferred_tool": "auto"},
+    ],
+    "research_plan_implement": [
+        {"type": "research", "description": "Research topic and gather information", "preferred_tool": "auto"},
+        {"type": "coding", "description": "Create implementation plan based on research", "preferred_tool": "auto"},
+        {"type": "coding", "description": "Implement the planned solution", "preferred_tool": "auto"},
+    ],
+    "audit_fix_verify": [
+        {"type": "research", "description": "Audit current state and identify issues", "preferred_tool": "auto"},
+        {"type": "coding", "description": "Fix identified issues", "preferred_tool": "auto"},
+        {"type": "coding", "description": "Verify fixes and validate results", "preferred_tool": "auto"},
+    ],
+}
+
+
+def create_chain(
+    workflow_name: str,
+    workspace: str | None = None,
+    parent_task_id: str | None = None,
+) -> list[dict[str, Any]]:
+    tasks = []
+    workflow = CHAIN_WORKFLOWS.get(workflow_name, [])
+    if not workflow:
+        log(f"Unknown chain workflow: {workflow_name}")
+        return []
+
+    for i, step in enumerate(workflow):
+        chain_context = f"[Chain: {workflow_name}] " if i > 0 else ""
+        task = create_task(
+            description=chain_context + step["description"],
+            task_type=step.get("type", "coding"),
+            workspace=workspace,
+            preferred_tool=step.get("preferred_tool", "auto"),
+            schedule_mode="manual",
+        )
+        if task:
+            if parent_task_id:
+                update_existing_task(task["id"], {"parent_task_id": parent_task_id})
+            if i > 0 and tasks:
+                prev_task = tasks[-1]
+                update_existing_task(prev_task["id"], {"chain_next_id": task["id"]})
+            tasks.append(task)
+
+    if tasks and parent_task_id:
+        update_existing_task(parent_task_id, {"chain_next_id": tasks[0]["id"]})
+
+    log(f"Created chain '{workflow_name}' with {len(tasks)} tasks")
+    return tasks
+
+
+def continue_chain(
+    completed_task: TaskDict,
+    outcome: str = "success",
+) -> dict[str, Any] | None:
+    chain_next_id = completed_task.get("chain_next_id")
+    if not chain_next_id:
+        chain_id = completed_task.get("chain_id")
+        if chain_id:
+            tasks = load_tasks()
+            for t in tasks:
+                if t.get("id") == chain_id and t.get("chain_next_id"):
+                    chain_next_id = t.get("chain_next_id")
+                    break
+
+    if not chain_next_id:
+        return None
+
+    if outcome == "failure" and completed_task.get("chain_stop_on_failure", True):
+        log(f"Chain stopped due to task failure: {completed_task.get('id')}")
+        return None
+
+    next_task = update_existing_task(chain_next_id, {"status": "pending"})
+    if next_task:
+        log(f"Chain continued: started next task {chain_next_id}")
+    return next_task
+
+
+def get_chain_tasks(chain_id: str) -> list[dict[str, Any]]:
+    tasks = load_tasks()
+    chain_tasks = []
+    current_id = None
+    for t in tasks:
+        if t.get("id") == chain_id:
+            chain_tasks.append(t)
+            current_id = t.get("chain_next_id")
+            break
+
+    while current_id:
+        for t in tasks:
+            if t.get("id") == current_id:
+                chain_tasks.append(t)
+                current_id = t.get("chain_next_id")
+                break
+        else:
+            break
+
+    return chain_tasks
+
+
 # ── scheduling ────────────────────────────────────────────────────────────────
 
 RATE_LIMIT_PHRASES = [
