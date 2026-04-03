@@ -241,7 +241,7 @@ function buildPrompt(
     "Execute cases yourself as a browser agent using Playwright from /opt/vps-dashboard/regression_tests/.venv/bin/python.",
     "IMPORTANT browser interaction rules:",
     "(a) For checkboxes always use locator.check() — never .click() or .evaluate('e => e.click()') as the app is React-based and requires proper change events.",
-    "(a.1) In allinonepos signup, you MUST accept this exact checkbox text before submit: 'I agree to Marx Merchant Portal Terms of Use and have read and acknowledged Privacy Policy'. Verify checkbox is checked (is_checked=true). If not checked or submit is blocked by terms validation, mark FAIL.",
+    "(a.1) If a signup or registration form has terms/privacy checkboxes, always check them before submit using locator.check(). Verify checkbox is checked (is_checked=true). If not checked or submit is blocked by terms validation, mark FAIL.",
     "(b) After any form submission wait at least 3 seconds before checking the result.",
     "(c) For this app, /signup/ is the registration page and /signup-verification/ is the OTP page. Registration is SUCCESS only with explicit signal: redirected to /signup-verification/, OR clear success toast/message, OR explicit account-already-exists message.",
     "(c.2) If submit completes but URL remains on /signup/ without explicit success signal, treat as FAIL.",

@@ -7,7 +7,7 @@ import path from "path";
 const execAsync = promisify(exec);
 
 const PROJECTS_ROOT = "/opt/workspaces";
-const DEFAULT_BULK_OWNER = "allinonepos";
+const DEFAULT_BULK_OWNER = process.env.GITHUB_OWNER ?? "";
 const GITHUB_API_BASE = "https://api.github.com";
 
 async function runCommand(cmd: string): Promise<string> {
