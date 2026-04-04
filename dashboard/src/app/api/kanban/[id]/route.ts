@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const db = getDb();
     const ticket = await db.select().from(schema.kanbanTickets).where(eq(schema.kanbanTickets.id, params.id)).get();
@@ -21,10 +19,8 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const body = await request.json();
     const { title, description, column, position, priority, assignee, labels, dueDate } = body;
@@ -56,10 +52,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const db = getDb();
     await db.delete(schema.kanbanTickets).where(eq(schema.kanbanTickets.id, params.id));

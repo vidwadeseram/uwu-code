@@ -3,10 +3,8 @@ import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { execFileSync } from "child_process";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const db = getDb();
     const script = await db.select().from(schema.scripts).where(eq(schema.scripts.id, params.id)).get();
@@ -22,10 +20,8 @@ export async function GET(
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const body = await request.json();
     const { name, description, content, isFavorite } = body;
@@ -53,10 +49,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const db = getDb();
     await db.delete(schema.scripts).where(eq(schema.scripts.id, params.id));
@@ -67,10 +61,8 @@ export async function DELETE(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const body = await request.json();
     const { worktreeId } = body;

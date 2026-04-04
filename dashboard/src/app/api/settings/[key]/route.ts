@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { key: string } }
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ key: string }> }) {
+  const params = await context.params;
   try {
     const key = params.key;
     const db = getDb();
@@ -22,10 +20,8 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { key: string } }
-) {
+export async function PUT(request: NextRequest, context: { params: Promise<{ key: string }> }) {
+  const params = await context.params;
   try {
     const key = params.key;
     const body = await request.json();
@@ -58,10 +54,8 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { key: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ key: string }> }) {
+  const params = await context.params;
   try {
     const key = params.key;
     const db = getDb();

@@ -35,7 +35,7 @@ async function isAuthenticated(request: NextRequest): Promise<boolean> {
   return !!payload;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
   if (pathname.startsWith("/_next") || pathname === "/favicon.ico") {

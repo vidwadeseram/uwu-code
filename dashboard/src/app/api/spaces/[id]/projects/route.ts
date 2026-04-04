@@ -3,10 +3,8 @@ import { getDb, schema } from "@/lib/db";
 import { eq, and } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const body = await request.json();
     const { projectId } = body;
@@ -52,10 +50,8 @@ export async function POST(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const params = await context.params;
   try {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");

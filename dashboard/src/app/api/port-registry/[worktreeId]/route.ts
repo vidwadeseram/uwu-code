@@ -2,10 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { worktreeId: string } }
-) {
+export async function DELETE(request: NextRequest, context: { params: Promise<{ worktreeId: string }> }) {
+  const params = await context.params;
   try {
     const db = getDb();
     const worktreeId = params.worktreeId;
