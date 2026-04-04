@@ -46,14 +46,17 @@ export default function LoginPage() {
   if (checking) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ background: "#0a0e1a" }}>
-        <div className="text-sm" style={{ color: "#4a5568" }}>Checking session…</div>
+        <span
+          className="spinner w-8 h-8"
+          style={{ border: "2px solid rgba(0,255,136,0.15)", borderTopColor: "#00ff88" }}
+        />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "#0a0e1a" }}>
-      <div className="w-full max-w-sm flex flex-col gap-6">
+      <div className="w-full max-w-sm flex flex-col gap-6 fade-in">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
           <div
@@ -133,7 +136,11 @@ export default function LoginPage() {
               cursor: loading ? "not-allowed" : "pointer",
             }}
           >
-            {loading ? "Signing in…" : "Sign In"}
+            {loading ? (
+              <span className="flex items-center justify-center">
+                <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(0,255,136,0.2)", borderTopColor: "#00ff88" }} />
+              </span>
+            ) : "Sign In"}
           </button>
         </form>
       </div>

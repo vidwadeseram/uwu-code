@@ -177,7 +177,11 @@ function ApiKeysSection({ authed }: { authed: boolean }) {
           opacity: saving ? 0.6 : 1,
         }}
       >
-        {saving ? "Saving…" : "Save Keys"}
+        {saving ? (
+          <span className="flex items-center justify-center">
+            <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(0,212,255,0.2)", borderTopColor: "#00d4ff" }} />
+          </span>
+        ) : "Save Keys"}
       </button>
     </Section>
   );
@@ -334,7 +338,11 @@ function CredentialsSection({ authState, onAuthChange }: { authState: AuthState;
               opacity: saving ? 0.6 : 1,
             }}
           >
-            {saving ? "Saving…" : authState.authEnabled ? "Update Credentials" : "Enable Login"}
+            {saving ? (
+              <span className="flex items-center justify-center">
+                <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(0,255,136,0.2)", borderTopColor: "#00ff88" }} />
+              </span>
+            ) : authState.authEnabled ? "Update Credentials" : "Enable Login"}
           </button>
 
           {authState.authEnabled && (
@@ -471,7 +479,11 @@ function GitHubSection() {
             opacity: saving || !token.trim() ? 0.6 : 1,
           }}
         >
-          {saving ? "Saving…" : "Save Token"}
+          {saving ? (
+            <span className="flex items-center justify-center">
+              <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(168,85,247,0.2)", borderTopColor: "#a855f7" }} />
+            </span>
+          ) : "Save Token"}
         </button>
 
         {connected && (
@@ -559,8 +571,16 @@ function ModelPicker({
                   <span className="flex-shrink-0 text-xs" style={{ color: "#4a5568" }}>${selected.prompt_price_per_m}/M</span>
                 )}
               </>
+            ) : loading ? (
+              <span className="flex items-center gap-2">
+                <span
+                  className="spinner w-3 h-3 inline-block flex-shrink-0"
+                  style={{ border: "1.5px solid rgba(0,212,255,0.2)", borderTopColor: "#00d4ff" }}
+                />
+                <span style={{ color: "#4a5568" }}>Models…</span>
+              </span>
             ) : (
-              <span style={{ color: "#4a5568" }}>{loading ? "Loading models…" : value || "Select model…"}</span>
+              <span style={{ color: "#4a5568" }}>{value || "Select model…"}</span>
             )}
           </span>
           <svg className="w-3 h-3 flex-shrink-0 ml-2" style={{ color: "#4a5568" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -716,7 +736,11 @@ function ModelsSection() {
           opacity: saving || loading ? 0.6 : 1,
         }}
       >
-        {saving ? "Saving…" : "Save Models"}
+        {saving ? (
+          <span className="flex items-center justify-center">
+            <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(0,212,255,0.2)", borderTopColor: "#00d4ff" }} />
+          </span>
+        ) : "Save Models"}
       </button>
     </Section>
   );
@@ -750,13 +774,18 @@ export default function SettingsPage() {
   if (loading) {
     return (
       <div className="max-w-screen-md mx-auto px-4 py-6">
-        <div className="text-sm" style={{ color: "#4a5568" }}>Loading…</div>
+        <div className="flex flex-col gap-3 pt-2">
+          <div className="skeleton h-8 w-48" />
+          <div className="skeleton h-4 w-64" />
+          <div className="skeleton h-32 w-full mt-4" />
+          <div className="skeleton h-32 w-full" />
+        </div>
       </div>
     );
   }
 
   return (
-      <div className="max-w-screen-md mx-auto px-4 py-6 space-y-6">
+      <div className="max-w-screen-md mx-auto px-4 py-6 space-y-6 fade-in">
         {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">

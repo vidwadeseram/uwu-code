@@ -765,9 +765,8 @@ function NewTaskForm({
           }}
         >
           {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <span className="spinner w-3.5 h-3.5 inline-block" style={{ border: "1.5px solid rgba(0,255,136,0.3)", borderTopColor: "#00ff88" }} />
-              {scheduleMode === "anytime" ? "Queue Task" : scheduleMode === "manual" ? "Create Manual Task" : "Schedule Task"}
+            <span className="flex items-center justify-center">
+              <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(0,255,136,0.2)", borderTopColor: "#00ff88" }} />
             </span>
           ) : scheduleMode === "anytime" ? "Queue Task" : scheduleMode === "manual" ? "Create Manual Task" : "Schedule Task"}
         </button>
@@ -819,8 +818,10 @@ function NewTaskForm({
 
             <div className="p-3 overflow-y-auto space-y-2" style={{ maxHeight: "50vh" }}>
               {pickerLoading && (
-                <div className="text-xs px-3 py-2 rounded" style={{ color: "#94a3b8", background: "rgba(30,45,74,0.3)" }}>
-                  Loading folders...
+                <div className="flex flex-col gap-2 px-1 py-1">
+                  {[75, 55, 65, 45, 70].map((w, i) => (
+                    <div key={i} className="skeleton h-8 rounded" style={{ width: `${w}%`, animationDelay: `${i * 0.07}s` }} />
+                  ))}
                 </div>
               )}
               {pickerError && (
@@ -952,7 +953,7 @@ export default function SchedulerPage() {
   const manual   = active.filter((t) => t.status === "manual").length;
 
   return (
-    <div className="max-w-screen-lg mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-screen-lg mx-auto px-4 py-6 space-y-6 fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -1049,11 +1050,19 @@ export default function SchedulerPage() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="card animate-pulse" style={{ height: 100 }} />
+            <div key={i} className="card p-4 space-y-3" style={{ animationDelay: `${(i - 1) * 0.08}s` }}>
+              <div className="flex items-center gap-3">
+                <div className="skeleton h-3 w-3 rounded-full" />
+                <div className="skeleton h-4 rounded" style={{ width: "55%" }} />
+                <div className="skeleton h-5 rounded ml-auto" style={{ width: "15%" }} />
+              </div>
+              <div className="skeleton h-3 rounded" style={{ width: "80%" }} />
+              <div className="skeleton h-3 rounded" style={{ width: "40%" }} />
+            </div>
           ))}
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 fade-in">
           {(tab === "active" ? active : completed).length === 0 ? (
             <div
               className="card flex flex-col items-center justify-center py-16 gap-3"
@@ -1074,14 +1083,15 @@ export default function SchedulerPage() {
             (tab === "active" ? active : completed)
               .slice()
               .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .map((task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onDelete={() => deleteTask(task.id)}
-                  onViewReport={() => setReport(task)}
-                  onQueueNow={() => queueNowTask(task.id)}
-                />
+              .map((task, i) => (
+                <div key={task.id} className="slide-up" style={{ "--i": i } as React.CSSProperties}>
+                  <TaskCard
+                    task={task}
+                    onDelete={() => deleteTask(task.id)}
+                    onViewReport={() => setReport(task)}
+                    onQueueNow={() => queueNowTask(task.id)}
+                  />
+                </div>
               ))
           )}
         </div>

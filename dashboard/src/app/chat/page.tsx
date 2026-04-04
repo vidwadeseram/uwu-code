@@ -336,9 +336,8 @@ function ScheduleModal({ onClose, defaultTitle, defaultDescription }: ScheduleMo
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={handleSchedule} disabled={saving || !description.trim()} className="flex-1 py-2 rounded text-sm font-medium disabled:opacity-50" style={{ background: "rgba(255,215,0,0.12)", color: "#ffd700", border: "1px solid rgba(255,215,0,0.3)" }}>
                   {saving ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="spinner w-3.5 h-3.5 inline-block" style={{ border: "1.5px solid rgba(255,215,0,0.3)", borderTopColor: "#ffd700" }} />
-                      Queue Task
+                    <span className="flex items-center justify-center">
+                      <span className="spinner w-4 h-4 inline-block" style={{ border: "2px solid rgba(255,215,0,0.2)", borderTopColor: "#ffd700" }} />
                     </span>
                   ) : "Queue Task"}
                 </button>
@@ -455,7 +454,7 @@ export default function ChatPage() {
   const isEmpty = messages.length === 0;
 
   return (
-    <div className="flex flex-col h-[calc(100dvh-3.5rem)] min-h-[calc(100dvh-3.5rem)]" style={{ background: "#0a0e1a" }}>
+    <div className="flex flex-col h-[calc(100dvh-3.5rem)] min-h-[calc(100dvh-3.5rem)] fade-in" style={{ background: "#0a0e1a" }}>
       {/* Header */}
       <div
         className="flex-shrink-0 px-3 sm:px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b"
