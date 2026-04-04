@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
 import { FileTree, FileNode } from "@/components/file-explorer/FileTree";
 import { DiffViewer } from "@/components/file-explorer/DiffViewer";
@@ -12,6 +12,11 @@ interface Project {
   name: string;
   path: string;
 }
+
+const SIDEBAR_MIN_WIDTH = 200;
+const SIDEBAR_MAX_WIDTH = 600;
+const DEFAULT_SIDEBAR_WIDTH = 280;
+const MOBILE_BREAKPOINT = 768;
 
 export default function FilesPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -27,11 +32,66 @@ export default function FilesPage() {
   const [showDiff, setShowDiff] = useState(false);
   const [diffMode, setDiffMode] = useState<"inline" | "side-by-side">("inline");
   const [error, setError] = useState<string | null>(null);
-
   const [projectsLoading, setProjectsLoading] = useState(true);
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isDragging = useRef(false);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
+
   useEffect(() => {
-    // Load projects on mount. If no projects exist we show a friendly empty state.
+    const checkMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("fileExplorerSidebarWidth");
+    if (saved) {
+      const width = parseInt(saved, 10);
+      if (width >= SIDEBAR_MIN_WIDTH && width <= SIDEBAR_MAX_WIDTH) {
+        setSidebarWidth(width);
+      }
+    }
+  }, []);
+
+  const saveSidebarWidth = useCallback((width: number) => {
+    localStorage.setItem("fileExplorerSidebarWidth", String(width));
+    setSidebarWidth(width);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDragging.current) return;
+      const newWidth = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, e.clientX));
+      saveSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      if (isDragging.current) {
+        isDragging.current = false;
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+      }
+    };
+
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [saveSidebarWidth]);
+
+  const startDrag = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDragging.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
     setProjectsLoading(true);
     fetch("/api/projects")
       .then((res) => res.json())
@@ -40,7 +100,6 @@ export default function FilesPage() {
           setProjects(data.projects);
           setSelectedProjectId(data.projects[0].id);
         } else {
-          // No projects returned
           setProjects([]);
           setSelectedProjectId("");
         }
@@ -118,8 +177,11 @@ export default function FilesPage() {
       loadFile(selectedProjectId, path);
       loadDiff(selectedProjectId, path);
       setShowDiff(false);
+      if (isMobile) {
+        setSidebarOpen(false);
+      }
     },
-    [selectedProjectId, loadFile, loadDiff]
+    [selectedProjectId, loadFile, loadDiff, isMobile]
   );
 
   const handleSave = async () => {
@@ -155,6 +217,21 @@ export default function FilesPage() {
   return (
     <div className="h-screen flex flex-col fade-in" style={{ background: "var(--bg)", color: "var(--text)" }}>
       <div className="flex items-center gap-4 px-4 py-3" style={{ background: "var(--card)", borderBottom: "1px solid var(--border)" }}>
+        <button
+          type="button"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="md:hidden p-2 rounded"
+          style={{ background: "rgba(30,45,74,.5)" }}
+          aria-label={sidebarOpen ? "Close file tree" : "Open file tree"}
+        >
+          <svg viewBox="0 0 24 24" fill="none" style={{ width: 20, height: 20 }} aria-hidden="true">
+            {sidebarOpen ? (
+              <path d="M6 18L18 6M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            ) : (
+              <path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            )}
+          </svg>
+        </button>
         <h1 className="text-lg font-semibold" style={{ color: "var(--text)" }}>File Explorer</h1>
         <select
           value={selectedProjectId}
@@ -173,7 +250,7 @@ export default function FilesPage() {
           placeholder="Filter files..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="px-3 py-1.5 rounded text-sm flex-1 max-w-xs"
+          className="px-3 py-1.5 rounded text-sm flex-1 max-w-xs hidden md:block"
           style={{ background: "rgba(30,45,74,.5)", borderColor: "var(--border)" }}
         />
         {selectedPath && (
@@ -220,55 +297,89 @@ export default function FilesPage() {
       )}
 
       {projects.length === 0 && !projectsLoading ? (
-        <div style={{ display: 'grid', placeItems: 'center', flex: 1 }}>
+        <div style={{ display: "grid", placeItems: "center", flex: 1 }}>
           <span style={{ color: "var(--dim)" }}>No projects found. Add a project from the Dashboard.</span>
         </div>
       ) : (
-        <div className="flex-1 grid grid-cols-4 gap-0 overflow-hidden">
-          <div className="col-span-1 overflow-hidden border-r" style={{ borderColor: 'var(--border)' }}>
-            <div className="h-full overflow-auto p-2" style={{ overflow: 'auto' }}>
+        <div className="flex-1 flex overflow-hidden relative">
+          {isMobile && sidebarOpen && (
+            <div
+              className="fixed inset-0 bg-black/50 z-40"
+              onClick={() => setSidebarOpen(false)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === "Escape" && setSidebarOpen(false)}
+              aria-label="Close sidebar"
+            />
+          )}
+
+          <div
+            className="flex-none h-full flex flex-col border-r overflow-hidden"
+            style={{
+              width: isMobile ? (sidebarOpen ? "280px" : "0") : `${sidebarWidth}px`,
+              borderColor: "var(--border)",
+              transition: isMobile ? "width 0.2s ease" : "none",
+              flexShrink: 0,
+            }}
+          >
+            {!isMobile && (
+              <div
+                onMouseDown={startDrag}
+                className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-cyan-500/50 active:bg-cyan-500/70 z-10"
+                style={{ background: "var(--border)" }}
+                role="slider"
+                aria-label="Resize sidebar"
+                aria-valuemin={SIDEBAR_MIN_WIDTH}
+                aria-valuemax={SIDEBAR_MAX_WIDTH}
+                aria-valuenow={sidebarWidth}
+                tabIndex={0}
+              />
+            )}
+            <div className="flex-1 overflow-auto p-2">
               {loading && tree.length === 0 ? (
                 <div className="flex flex-col gap-2 p-2">
                   {[70, 55, 80, 45, 65, 60].map((w, i) => (
-                    <div key={i} className="skeleton h-3" style={{ width: `${w}%`, animationDelay: `${i * 0.07}s` }} />
+                    <div key={`skeleton-${i}`} className="skeleton h-3" style={{ width: `${w}%`, animationDelay: `${i * 0.07}s` }} />
                   ))}
                 </div>
               ) : tree.length === 0 ? (
-                <div style={{ color: 'var(--dim)' }}>No files found</div>
+                <div style={{ color: "var(--dim)" }}>No files found</div>
               ) : (
-                <FileTree
-                  nodes={tree}
-                  selectedPath={selectedPath}
-                  onSelect={handleSelect}
-                  filter={filter}
-                />
+                <FileTree nodes={tree} selectedPath={selectedPath} onSelect={handleSelect} filter={filter} />
               )}
             </div>
           </div>
 
-          <div className="col-span-1 overflow-hidden border-r" style={{ display: showDiff ? 'block' : 'none', borderColor: 'var(--border)' }}>
-            <DiffViewer oldContent={originalContent} newContent={fileContent} mode={diffMode} />
-          </div>
+          <div className="flex-1 flex overflow-hidden">
+            <div
+              className="overflow-hidden border-r"
+              style={{
+                width: showDiff ? (isMobile ? "50%" : "33.333%") : "0",
+                borderColor: "var(--border)",
+                transition: "width 0.2s ease",
+                display: showDiff ? "block" : "none",
+                flexShrink: 0,
+              }}
+            >
+              <DiffViewer oldContent={originalContent} newContent={fileContent} mode={diffMode} />
+            </div>
 
-          <div className={`${showDiff ? "col-span-2" : "col-span-3"} overflow-hidden`}>
-            {selectedPath ? (
-              <div className="h-full flex flex-col">
-                <div className="px-4 py-2" style={{ background: 'var(--card)', borderBottom: '1px solid var(--border)', color: 'var(--dim)' }}>
-                  {selectedPath}
+            <div className="flex-1 overflow-hidden">
+              {selectedPath ? (
+                <div className="h-full flex flex-col">
+                  <div className="px-4 py-2" style={{ background: "var(--card)", borderBottom: "1px solid var(--border)", color: "var(--dim)" }}>
+                    {selectedPath}
+                  </div>
+                  <div className="flex-1">
+                    <MonacoEditor value={fileContent} onChange={(val) => setFileContent(val || "")} path={selectedPath} />
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <MonacoEditor
-                    value={fileContent}
-                    onChange={(val) => setFileContent(val || "")}
-                    path={selectedPath}
-                  />
+              ) : (
+                <div className="h-full flex items-center justify-center" style={{ color: "var(--dim)" }}>
+                  Select a file to edit
                 </div>
-              </div>
-            ) : (
-              <div className="h-full flex items-center justify-center" style={{ color: 'var(--dim)' }}>
-                Select a file to edit
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
