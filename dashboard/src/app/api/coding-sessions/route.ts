@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
-import { spawn } from "child_process";
-import { execSync } from "child_process";
+import { execFile } from "child_process";
 
 interface CodingSessionInput {
   projectId: string;
@@ -18,33 +17,39 @@ function runTool(
   workingDir: string
 ): Promise<{ output: string; exitCode: number }> {
   return new Promise((resolve) => {
-    let cmd = "";
+    let command = "";
+    let args: string[] = [];
     switch (tool) {
       case "opencode":
-        cmd = `opencode "${task}"`;
+        command = "opencode";
+        args = [task];
         break;
       case "claude":
-        cmd = `claude --print "${task}"`;
+        command = "claude";
+        args = ["--print", task];
         break;
       case "codex":
-        cmd = `codex "${task}"`;
+        command = "codex";
+        args = [task];
         break;
     }
 
-    try {
-      const output = execSync(cmd, {
-        encoding: "utf-8",
-        timeout: 300000,
-        cwd: workingDir,
-      });
-      resolve({ output, exitCode: 0 });
-    } catch (err: unknown) {
-      const error = err as { stderr?: { toString?: () => string }; status?: number };
-      resolve({
-        output: error.stderr?.toString?.() || String(err),
-        exitCode: error.status || 1,
-      });
-    }
+    execFile(command, args, {
+      encoding: "utf-8",
+      timeout: 300000,
+      cwd: workingDir,
+      shell: false,
+    }, (err, stdout, stderr) => {
+      if (err) {
+        const error = err as { code?: number };
+        resolve({
+          output: stderr || String(err),
+          exitCode: error.code || 1,
+        });
+      } else {
+        resolve({ output: stdout, exitCode: 0 });
+      }
+    });
   });
 }
 

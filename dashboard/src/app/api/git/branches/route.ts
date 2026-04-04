@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
+import { validateGitRef } from "@/lib/sanitize";
 
 function getRepoPath(worktreeId?: string, projectId?: string): string | null {
   if (worktreeId) {
@@ -40,11 +41,11 @@ export async function GET(request: NextRequest) {
 
     const args = all ? ["branch", "-a", "--format=%(refname:short)|%(HEAD)|%(upstream:short)"] : ["branch", "--format=%(refname:short)|%(HEAD)|%(upstream:short)"];
 
-    const output = execSync(`git ${args.join(" ")}`, {
+    const output = execFileSync("git", args, {
       encoding: "utf-8",
       cwd: repoPath,
       timeout: 10000,
-    });
+    }) as string;
 
     const branches: Branch[] = [];
     for (const line of output.split("\n").filter(Boolean)) {
@@ -80,15 +81,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Branch name is required" }, { status: 400 });
     }
 
+    try {
+      validateGitRef(name);
+      if (startPoint) validateGitRef(startPoint);
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    }
+
     const args = startPoint ? ["checkout", "-b", name, startPoint] : ["checkout", "-b", name];
 
     try {
-      execSync(`git ${args.join(" ")}`, {
+      execFileSync("git", args, {
         cwd: repoPath,
         timeout: 10000,
       });
     } catch {
-      execSync(`git branch "${name}" ${startPoint ? startPoint : ""}`, {
+      const branchArgs = startPoint ? ["branch", name, startPoint] : ["branch", name];
+      execFileSync("git", branchArgs, {
         cwd: repoPath,
         timeout: 10000,
       });
@@ -119,16 +128,22 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Branch name is required" }, { status: 400 });
     }
 
+    try {
+      validateGitRef(name);
+    } catch (e) {
+      return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+    }
+
     const flag = force ? "-D" : "-d";
     const branchName = remote ? `origin/${name}` : name;
 
     try {
-      execSync(`git branch ${flag} "${branchName}"`, {
+      execFileSync("git", ["branch", flag, branchName], {
         cwd: repoPath,
         timeout: 10000,
       });
     } catch {
-      execSync(`git push origin --delete "${name}"`, {
+      execFileSync("git", ["push", "origin", "--delete", name], {
         cwd: repoPath,
         timeout: 10000,
       });

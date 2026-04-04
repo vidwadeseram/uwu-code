@@ -222,3 +222,27 @@ export type Script = typeof scripts.$inferSelect;
 export type NewScript = typeof scripts.$inferInsert;
 export type PortRegistry = typeof portRegistry.$inferSelect;
 export type NewPortRegistry = typeof portRegistry.$inferInsert;
+
+export const lspServers = sqliteTable("lsp_servers", {
+  id: text("id").primaryKey(),
+  worktreeId: text("worktree_id")
+    .notNull()
+    .references(() => worktrees.id, { onDelete: "cascade" }),
+  language: text("language").notNull(),
+  command: text("command").notNull(),
+  args: text("args"),
+  port: integer("port"),
+  status: text("status").default("stopped"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+});
+
+export const lspServersRelations = relations(lspServers, ({ one }) => ({
+  worktree: one(worktrees, {
+    fields: [lspServers.worktreeId],
+    references: [worktrees.id],
+  }),
+}));
+
+export type LspServer = typeof lspServers.$inferSelect;
+export type NewLspServer = typeof lspServers.$inferInsert;
