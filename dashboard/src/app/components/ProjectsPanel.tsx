@@ -52,14 +52,16 @@ function CloneForm({ onClose, onCloned }: CloneFormProps) {
     setError("");
     setSuccess("");
     try {
+      // Derive project name from git URL (e.g. "uwu-code" from "https://github.com/user/uwu-code.git")
+      const repoName = url.trim().replace(/\.git$/, "").split("/").pop() || "repo";
       const res = await fetch("/api/projects", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), dest: dest.trim() || undefined }),
+        body: JSON.stringify({ name: dest.trim() || repoName, gitUrl: url.trim() }),
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess(`Cloned to ${data.path}`);
+        setSuccess(data.message || "Cloned successfully");
         setUrl("");
         setDest("");
         onCloned();
@@ -382,8 +384,6 @@ function ProjectRow({
   deleting: boolean;
   onDelete: () => void;
 }) {
-  const terminalUrl = "/terminal/";
-
   return (
     <div
       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-3 py-2.5 rounded"
@@ -446,16 +446,15 @@ function ProjectRow({
 
       <div className="flex items-center gap-2 flex-wrap sm:justify-end">
         {/* Open Terminal button */}
-        <a
-          href={terminalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => window.open("/terminal/", "_blank", "noopener,noreferrer")}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all"
           style={{
             background: "rgba(0, 255, 136, 0.08)",
             border: "1px solid rgba(0, 255, 136, 0.2)",
             color: "#00ff88",
-            textDecoration: "none",
+            cursor: "pointer",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = "rgba(0, 255, 136, 0.16)";
@@ -481,7 +480,7 @@ function ProjectRow({
             <line x1="12" y1="17" x2="12" y2="21" />
           </svg>
           Terminal
-        </a>
+        </button>
 
         <button
           type="button"
