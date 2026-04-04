@@ -354,6 +354,9 @@ function NewTaskForm({
   const [weeklyDay, setWeeklyDay] = useState(() => new Date().getDay());
   const [weeklyTime, setWeeklyTime] = useState("09:00");
   const [workspace, setWorkspace] = useState("/opt/workspaces");
+  const [useWorktree, setUseWorktree] = useState(false);
+  const [worktrees, setWorktrees] = useState<Array<{ id: string; name: string; path: string; branch: string; isOnDisk: boolean }>>([]);
+  const [selectedWorktreeId, setSelectedWorktreeId] = useState("");
   const [tool, setTool] = useState<"auto" | "claude" | "opencode">("auto");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -362,6 +365,16 @@ function NewTaskForm({
   const [pickerError, setPickerError] = useState("");
   const [pickerSearch, setPickerSearch] = useState("");
   const [workspaceOptions, setWorkspaceOptions] = useState<WorkspaceOption[]>([]);
+
+  async function loadWorktrees() {
+    try {
+      const res = await fetch("/api/worktrees");
+      const data = await res.json();
+      setWorktrees(data.worktrees ?? []);
+    } catch {
+      // ignore
+    }
+  }
 
   async function loadWorkspaceOptions() {
     setPickerLoading(true);
@@ -629,35 +642,74 @@ function NewTaskForm({
       {type === "coding" && (
         <div className="flex flex-col lg:flex-row gap-3">
           <div className="flex flex-col gap-1 flex-1">
-            <div className="text-xs" style={{ color: "#4a5568" }}>Workspace</div>
-            <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex items-center justify-between">
+              <div className="text-xs" style={{ color: "#4a5568" }}>Workspace</div>
               <button
                 type="button"
-                onClick={openPicker}
-                className="px-3 py-2 rounded text-xs font-medium sm:w-auto w-full"
+                onClick={() => {
+                  setUseWorktree((v) => {
+                    if (!v) loadWorktrees();
+                    return !v;
+                  });
+                  setSelectedWorktreeId("");
+                }}
+                className="text-xs px-2 py-0.5 rounded transition-colors"
                 style={{
-                  background: "rgba(0,212,255,0.12)",
-                  color: "#00d4ff",
-                  border: "1px solid rgba(0,212,255,0.3)",
+                  background: useWorktree ? "rgba(168,85,247,0.12)" : "rgba(30,45,74,0.3)",
+                  color: useWorktree ? "#a855f7" : "#4a5568",
+                  border: `1px solid ${useWorktree ? "rgba(168,85,247,0.3)" : "rgba(30,45,74,0.5)"}`,
                 }}
               >
-                Select Folder
+                {useWorktree ? "⎇ Worktree" : "Use Worktree"}
               </button>
-              <div
-                className="px-3 py-2 rounded text-xs flex-1 font-mono"
-                style={{
-                  background: "rgba(10,14,26,0.8)",
-                  border: "1px solid rgba(30,45,74,0.8)",
-                  color: "#e2e8f0",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                }}
-                title={workspace}
-              >
-                {workspace}
-              </div>
             </div>
+            {useWorktree ? (
+              <select
+                style={{ ...SELECT, width: "100%" }}
+                value={selectedWorktreeId}
+                onChange={(e) => {
+                  setSelectedWorktreeId(e.target.value);
+                  const wt = worktrees.find((w) => w.id === e.target.value);
+                  if (wt) setWorkspace(wt.path);
+                }}
+              >
+                <option value="">Select worktree…</option>
+                {worktrees.map((wt) => (
+                  <option key={wt.id} value={wt.id}>
+                    {wt.name} ({wt.branch}){wt.isOnDisk ? "" : " — not on disk"}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  type="button"
+                  onClick={openPicker}
+                  className="px-3 py-2 rounded text-xs font-medium sm:w-auto w-full"
+                  style={{
+                    background: "rgba(0,212,255,0.12)",
+                    color: "#00d4ff",
+                    border: "1px solid rgba(0,212,255,0.3)",
+                  }}
+                >
+                  Select Folder
+                </button>
+                <div
+                  className="px-3 py-2 rounded text-xs flex-1 font-mono"
+                  style={{
+                    background: "rgba(10,14,26,0.8)",
+                    border: "1px solid rgba(30,45,74,0.8)",
+                    color: "#e2e8f0",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                  title={workspace}
+                >
+                  {workspace}
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-col gap-1 lg:w-[140px]">
             <label className="text-xs" htmlFor="tool" style={{ color: "#4a5568" }}>Tool</label>
@@ -712,7 +764,12 @@ function NewTaskForm({
             cursor: loading ? "not-allowed" : "pointer",
           }}
         >
-          {loading ? "Creating…" : scheduleMode === "anytime" ? "Queue Task" : scheduleMode === "manual" ? "Create Manual Task" : "Schedule Task"}
+          {loading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="spinner w-3.5 h-3.5 inline-block" style={{ border: "1.5px solid rgba(0,255,136,0.3)", borderTopColor: "#00ff88" }} />
+              {scheduleMode === "anytime" ? "Queue Task" : scheduleMode === "manual" ? "Create Manual Task" : "Schedule Task"}
+            </span>
+          ) : scheduleMode === "anytime" ? "Queue Task" : scheduleMode === "manual" ? "Create Manual Task" : "Schedule Task"}
         </button>
         <button
           onClick={onCancel}

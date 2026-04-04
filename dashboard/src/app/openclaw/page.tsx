@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,11 +54,6 @@ const STATE_BG: Record<string, string> = {
 // ── Log Viewer ────────────────────────────────────────────────────────────────
 
 function LogViewer({ lines }: { lines: string[] }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [lines]);
-
   return (
     <div
       className="flex flex-col h-full overflow-auto font-mono text-xs leading-relaxed p-4"
@@ -90,7 +85,6 @@ function LogViewer({ lines }: { lines: string[] }) {
           );
         })
       )}
-      <div ref={bottomRef} />
     </div>
   );
 }
@@ -274,11 +268,15 @@ export default function OpenClawPage() {
           </div>
           <div className="flex-1 overflow-hidden">
             {loading ? (
-              <div className="flex items-center justify-center h-full text-xs" style={{ color: "#1e2d4a" }}>
-                Loading…
+              <div className="flex flex-col gap-2 p-4">
+                {[100, 75, 90, 60, 85, 70, 95, 55].map((w, i) => (
+                  <div key={i} className="skeleton h-3" style={{ width: `${w}%`, animationDelay: `${i * 0.07}s` }} />
+                ))}
               </div>
             ) : (
-              <LogViewer lines={logs} />
+              <div className="fade-in h-full">
+                <LogViewer lines={logs} />
+              </div>
             )}
           </div>
         </div>

@@ -31,6 +31,18 @@ interface CommitLog {
   message: string;
 }
 
+interface Worktree {
+  id: string;
+  projectId: string;
+  name: string;
+  path: string;
+  branch: string;
+  isActive: boolean;
+  isOnDisk: boolean;
+  currentBranch: string;
+  createdAt: string;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -53,13 +65,17 @@ export default function GitPage() {
   const [status, setStatus] = useState<GitStatus | null>(null);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [logs, setLogs] = useState<CommitLog[]>([]);
+  const [worktrees, setWorktrees] = useState<Worktree[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"status" | "branches" | "log">("status");
+  const [activeTab, setActiveTab] = useState<"status" | "branches" | "log" | "worktrees">("status");
   const [commitMessage, setCommitMessage] = useState("");
   const [newBranchName, setNewBranchName] = useState("");
   const [showNewBranch, setShowNewBranch] = useState(false);
+  const [showNewWorktree, setShowNewWorktree] = useState(false);
+  const [newWorktreeName, setNewWorktreeName] = useState("");
+  const [newWorktreeBranch, setNewWorktreeBranch] = useState("");
 
   useEffect(() => {
     fetch("/api/projects")
@@ -113,13 +129,25 @@ export default function GitPage() {
     }
   }, [selectedProjectId]);
 
+  const loadWorktrees = useCallback(async () => {
+    if (!selectedProjectId) return;
+    try {
+      const res = await fetch(`/api/worktrees?projectId=${selectedProjectId}`);
+      const data = await res.json();
+      setWorktrees(data.worktrees || []);
+    } catch (err) {
+      console.error(err);
+    }
+  }, [selectedProjectId]);
+
   useEffect(() => {
     if (selectedProjectId) {
       loadStatus();
       loadBranches();
       loadLogs();
+      loadWorktrees();
     }
-  }, [selectedProjectId, loadStatus, loadBranches, loadLogs]);
+  }, [selectedProjectId, loadStatus, loadBranches, loadLogs, loadWorktrees]);
 
   const handleStage = async (files: string[]) => {
     if (!selectedProjectId || files.length === 0) return;
@@ -310,6 +338,53 @@ export default function GitPage() {
     }
   };
 
+  const handleCreateWorktree = async () => {
+    if (!selectedProjectId || !newWorktreeName.trim()) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/worktrees", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId: selectedProjectId,
+          name: newWorktreeName,
+          branch: newWorktreeBranch || newWorktreeName,
+          isNewBranch: true,
+        }),
+      });
+      if (res.ok) {
+        setSuccess(`Worktree ${newWorktreeName} created`);
+        setNewWorktreeName("");
+        setNewWorktreeBranch("");
+        setShowNewWorktree(false);
+        await loadWorktrees();
+        setTimeout(() => setSuccess(null), 2000);
+      } else {
+        const data = await res.json();
+        setError(data.error || "Failed to create worktree");
+      }
+    } catch (err) {
+      console.error(err);
+      setError("Failed to create worktree");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteWorktree = async (id: string) => {
+    setLoading(true);
+    try {
+      await fetch(`/api/worktrees/${id}`, { method: "DELETE" });
+      await loadWorktrees();
+      setSuccess("Worktree removed");
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const stagedFiles = status?.files.filter((f) => f.staged) || [];
   const unstagedFiles = status?.files.filter((f) => !f.staged) || [];
 
@@ -489,6 +564,26 @@ export default function GitPage() {
               }}
             >
               Log
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab("worktrees"); loadWorktrees(); }}
+              className="px-5 py-2.5 text-sm font-medium transition-colors"
+              style={{
+                color: activeTab === "worktrees" ? "var(--cyan)" : "var(--dim)",
+                borderBottom: activeTab === "worktrees" ? "2px solid var(--cyan)" : "2px solid transparent",
+                marginBottom: "-1px",
+              }}
+            >
+              Worktrees
+              {worktrees.length > 0 && (
+                <span
+                  className="ml-2 px-1.5 py-0.5 rounded text-xs"
+                  style={{ background: "rgba(30,45,74,0.5)", color: "var(--dim)" }}
+                >
+                  {worktrees.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -784,6 +879,99 @@ export default function GitPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {activeTab === "worktrees" && (
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium" style={{ color: "var(--text)" }}>Worktrees</h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewWorktree(!showNewWorktree)}
+                    className="px-3 py-1.5 rounded text-xs font-medium"
+                    style={{ background: "rgba(0,180,255,0.15)", border: "1px solid rgba(0,180,255,0.3)", color: "#00b4ff" }}
+                  >
+                    {showNewWorktree ? "Cancel" : "New Worktree"}
+                  </button>
+                </div>
+
+                {showNewWorktree && (
+                  <div
+                    className="flex flex-col gap-3 p-4 rounded-lg"
+                    style={{ background: "var(--card)", border: "1px solid var(--border)" }}
+                  >
+                    <input
+                      type="text"
+                      value={newWorktreeName}
+                      onChange={(e) => setNewWorktreeName(e.target.value)}
+                      placeholder="worktree-name"
+                      className="px-3 py-2 rounded text-sm font-mono"
+                      style={{ background: "rgba(30,45,74,0.5)", border: "1px solid var(--border)", color: "var(--text)" }}
+                    />
+                    <input
+                      type="text"
+                      value={newWorktreeBranch}
+                      onChange={(e) => setNewWorktreeBranch(e.target.value)}
+                      placeholder="Branch name (defaults to worktree name)"
+                      className="px-3 py-2 rounded text-sm font-mono"
+                      style={{ background: "rgba(30,45,74,0.5)", border: "1px solid var(--border)", color: "var(--text)" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleCreateWorktree}
+                      disabled={!newWorktreeName.trim()}
+                      className="px-4 py-2 rounded text-sm font-medium"
+                      style={{
+                        background: newWorktreeName.trim() ? "rgba(0,255,136,0.2)" : "rgba(30,45,74,0.5)",
+                        border: "1px solid var(--border)",
+                        color: newWorktreeName.trim() ? "var(--green)" : "var(--dim)",
+                      }}
+                    >
+                      Create
+                    </button>
+                  </div>
+                )}
+
+                {worktrees.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-sm" style={{ color: "var(--dim)" }}>No worktrees yet</p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg overflow-hidden" style={{ background: "var(--card)", border: "1px solid var(--border)" }}>
+                    {worktrees.map((wt) => (
+                      <div
+                        key={wt.id}
+                        className="flex items-center gap-3 px-4 py-3 group"
+                        style={{ borderBottom: "1px solid var(--border)" }}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ background: wt.isOnDisk ? "var(--green)" : "var(--red)" }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-mono text-sm" style={{ color: "var(--text)" }}>{wt.name}</div>
+                          <div className="text-xs font-mono truncate" style={{ color: "var(--dim)" }}>{wt.path}</div>
+                          {wt.currentBranch && (
+                            <div className="text-xs mt-0.5">
+                              <span className="px-1.5 py-0.5 rounded" style={{ background: "rgba(0,212,255,0.1)", color: "var(--cyan)" }}>
+                                {wt.currentBranch}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteWorktree(wt.id)}
+                          className="opacity-0 group-hover:opacity-100 text-xs px-2 py-1 rounded transition-opacity"
+                          style={{ color: "var(--red)" }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
