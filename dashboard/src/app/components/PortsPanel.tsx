@@ -180,7 +180,7 @@ export default function PortsPanel({
                 style={{
                   background: "rgba(30, 45, 74, 0.5)",
                   border: "1px solid rgba(30, 45, 74, 0.8)",
-                  color: "#e2e8f0",
+                  color: "var(--text)",
                   transitionProperty: "width",
                   transitionDuration: "200ms",
                 }}
@@ -227,10 +227,10 @@ export default function PortsPanel({
           <div className="animate-pulse p-4 space-y-3">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="flex gap-3">
-                <div className="h-4 rounded w-12" style={{ background: "#1e2d4a" }} />
-                <div className="h-4 rounded w-20" style={{ background: "#1e2d4a" }} />
-                <div className="h-4 rounded w-10" style={{ background: "#1e2d4a" }} />
-                <div className="h-4 rounded flex-1" style={{ background: "#1e2d4a" }} />
+                <div className="h-4 rounded w-12" style={{ background: "var(--border)" }} />
+                <div className="h-4 rounded w-20" style={{ background: "var(--border)" }} />
+                <div className="h-4 rounded w-10" style={{ background: "var(--border)" }} />
+                <div className="h-4 rounded flex-1" style={{ background: "var(--border)" }} />
               </div>
             ))}
           </div>
@@ -351,7 +351,7 @@ function PortRow({
           </svg>
           <span
             className="font-mono text-xs"
-            style={{ color: "#e2e8f0" }}
+            style={{ color: "var(--text)" }}
           >
             {port.processName}
           </span>
@@ -362,7 +362,7 @@ function PortRow({
       <td>
         <span
           className="font-mono text-xs"
-          style={{ color: "#94a3b8" }}
+          style={{ color: "var(--dim)" }}
         >
           {port.pid ?? "—"}
         </span>
@@ -388,7 +388,7 @@ function PortRow({
             {port.matchedWindow && (
               <span
                 className="text-xs"
-                style={{ color: "#94a3b8" }}
+                style={{ color: "var(--dim)" }}
               >
                 /{port.matchedWindow}
               </span>

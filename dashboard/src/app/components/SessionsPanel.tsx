@@ -100,7 +100,7 @@ function WindowRow({
               background: window.active
                 ? "rgba(0, 255, 136, 0.2)"
                 : "rgba(30, 45, 74, 0.6)",
-              color: window.active ? "#00ff88" : "#94a3b8",
+              color: window.active ? "#00ff88" : "var(--dim)",
               fontSize: "0.65rem",
               fontWeight: 700,
             }}
@@ -111,7 +111,7 @@ function WindowRow({
           {/* Window name */}
           <span
             className="text-sm font-medium truncate"
-            style={{ color: window.active ? "#e2e8f0" : "#94a3b8" }}
+            style={{ color: window.active ? "var(--text)" : "var(--dim)" }}
           >
             {window.windowName}
           </span>
@@ -147,7 +147,7 @@ function WindowRow({
       {window.cwd && (
         <div
           className="flex items-center gap-1.5 text-xs"
-          style={{ color: "#94a3b8" }}
+          style={{ color: "var(--dim)" }}
           title={window.cwd}
         >
           <svg
@@ -322,7 +322,7 @@ function SessionCard({
           {/* Session name */}
           <span
             className="font-semibold text-sm truncate"
-            style={{ color: "#e2e8f0" }}
+            style={{ color: "var(--text)" }}
           >
             {session.name}
           </span>
@@ -359,7 +359,7 @@ function SessionCard({
             className="badge"
             style={{
               background: "rgba(30, 45, 74, 0.6)",
-              color: "#94a3b8",
+              color: "var(--dim)",
               border: "1px solid rgba(30, 45, 74, 0.8)",
             }}
           >
@@ -382,7 +382,7 @@ function SessionCard({
             disabled={stopping}
             className="px-2 py-0.5 rounded text-xs font-medium"
             style={{
-              background: stopping ? "rgba(30,45,74,0.5)" : "rgba(255,68,68,0.12)",
+              background: stopping ? "var(--btn-bg)" : "rgba(255,68,68,0.12)",
               border: "1px solid rgba(255,68,68,0.3)",
               color: stopping ? "#4a5568" : "#ff4444",
             }}
@@ -524,11 +524,11 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
               <div className="flex items-center gap-3 px-4 py-3">
                 <div
                   className="w-7 h-7 rounded"
-                  style={{ background: "#1e2d4a" }}
+                  style={{ background: "var(--border)" }}
                 />
                 <div
                   className="h-4 rounded"
-                  style={{ background: "#1e2d4a", width: "40%" }}
+                  style={{ background: "var(--border)", width: "40%" }}
                 />
               </div>
             </div>
@@ -558,7 +558,7 @@ export default function SessionsPanel({ sessions, ports, loading, onRefresh, onE
             Start a session with{" "}
             <code
               className="px-1.5 py-0.5 rounded"
-              style={{ background: "#1e2d4a", color: "#00ff88" }}
+              style={{ background: "var(--btn-bg)", color: "var(--green)" }}
             >
               tmux new -s mysession
             </code>

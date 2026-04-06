@@ -17,6 +17,9 @@
   --btn-bg: rgba(30,45,74,0.5);
   --hover-bg: rgba(255,255,255,0.05);
   --selected-bg: rgba(0,212,255,0.1);
+  --input-bg: rgba(10,14,26,0.8);
+  --input-border: rgba(30,45,74,0.8);
+  --surface: rgba(30,45,74,0.6);
 }
 
 .light,
@@ -34,6 +37,9 @@
   --btn-bg: rgba(0,0,0,0.06);
   --hover-bg: rgba(0,0,0,0.05);
   --selected-bg: rgba(8,145,178,0.12);
+  --input-bg: rgba(0,0,0,0.04);
+  --input-border: rgba(0,0,0,0.12);
+  --surface: rgba(0,0,0,0.04);
 }
 
 * {

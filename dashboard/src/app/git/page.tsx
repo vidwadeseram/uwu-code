@@ -414,7 +414,7 @@ export default function GitPage() {
                 onChange={(e) => setSelectedProjectId(e.target.value)}
                 className="px-3 py-1.5 rounded text-sm font-mono"
                 style={{
-                  background: "rgba(30,45,74,0.5)",
+                  background: "var(--btn-bg)",
                   border: "1px solid var(--border)",
                   color: "var(--text)",
                   minWidth: "140px",
@@ -439,7 +439,7 @@ export default function GitPage() {
                 onClick={loadStatus}
                 disabled={loading}
                 className="px-3 py-1.5 rounded text-xs font-medium transition-opacity disabled:opacity-50"
-                style={{ background: "rgba(30,45,74,0.5)", border: "1px solid var(--border)", color: "var(--dim)" }}
+                style={{ background: "var(--btn-bg)", border: "1px solid var(--border)", color: "var(--dim)" }}
               >
                 Refresh
               </button>
@@ -489,7 +489,7 @@ export default function GitPage() {
           {status && (
             <div
               className="flex items-center gap-6 px-5 py-2.5 text-sm"
-              style={{ background: "rgba(30,45,74,0.3)", borderBottom: "1px solid var(--border)" }}
+              style={{ background: "var(--hover-bg)", borderBottom: "1px solid var(--border)" }}
             >
               <div className="flex items-center gap-2">
                 <span style={{ color: "var(--dim)" }}>Branch</span>
@@ -554,7 +554,7 @@ export default function GitPage() {
               Branches
               <span
                 className="ml-2 px-1.5 py-0.5 rounded text-xs"
-                style={{ background: "rgba(30,45,74,0.5)", color: "var(--dim)" }}
+                style={{ background: "var(--btn-bg)", color: "var(--dim)" }}
               >
                 {branches.length}
               </span>
@@ -585,7 +585,7 @@ export default function GitPage() {
               {worktrees.length > 0 && (
                 <span
                   className="ml-2 px-1.5 py-0.5 rounded text-xs"
-                  style={{ background: "rgba(30,45,74,0.5)", color: "var(--dim)" }}
+                  style={{ background: "var(--btn-bg)", color: "var(--dim)" }}
                 >
                   {worktrees.length}
                 </span>
@@ -739,7 +739,7 @@ export default function GitPage() {
                       className="w-full px-3 py-2 rounded text-sm resize-none font-mono"
                       rows={3}
                       style={{
-                        background: "rgba(30,45,74,0.5)",
+                        background: "var(--btn-bg)",
                         border: "1px solid var(--border)",
                         color: "var(--text)",
                       }}
@@ -756,7 +756,7 @@ export default function GitPage() {
                         style={{
                           background: stagedFiles.length > 0 && commitMessage.trim()
                             ? "rgba(0,255,136,0.2)"
-                            : "rgba(30,45,74,0.5)",
+                            : "var(--btn-bg)",
                           border: "1px solid var(--border)",
                           color: stagedFiles.length > 0 && commitMessage.trim() ? "var(--green)" : "var(--dim)",
                           minWidth: "80px",
@@ -806,7 +806,7 @@ export default function GitPage() {
                       onKeyDown={(e) => e.key === "Enter" && handleCreateBranch()}
                       placeholder="feature/branch-name"
                       className="flex-1 px-3 py-2 rounded text-sm font-mono"
-                      style={{ background: "rgba(30,45,74,0.5)", border: "1px solid var(--border)", color: "var(--text)" }}
+                      style={{ background: "var(--btn-bg)", border: "1px solid var(--border)", color: "var(--text)" }}
                     />
                     <button
                       type="button"
@@ -814,7 +814,7 @@ export default function GitPage() {
                       disabled={!newBranchName.trim() || loading}
                       className="px-4 py-2 rounded text-sm font-medium flex items-center justify-center"
                       style={{
-                        background: newBranchName.trim() ? "rgba(0,255,136,0.2)" : "rgba(30,45,74,0.5)",
+                        background: newBranchName.trim() ? "rgba(0,255,136,0.2)" : "var(--btn-bg)",
                         border: "1px solid var(--border)",
                         color: newBranchName.trim() ? "var(--green)" : "var(--dim)",
                         minWidth: "70px",
@@ -926,7 +926,7 @@ export default function GitPage() {
                       onChange={(e) => setNewWorktreeName(e.target.value)}
                       placeholder="worktree-name"
                       className="px-3 py-2 rounded text-sm font-mono"
-                      style={{ background: "rgba(30,45,74,0.5)", border: "1px solid var(--border)", color: "var(--text)" }}
+                      style={{ background: "var(--btn-bg)", border: "1px solid var(--border)", color: "var(--text)" }}
                     />
                     <input
                       type="text"
@@ -934,7 +934,7 @@ export default function GitPage() {
                       onChange={(e) => setNewWorktreeBranch(e.target.value)}
                       placeholder="Branch name (defaults to worktree name)"
                       className="px-3 py-2 rounded text-sm font-mono"
-                      style={{ background: "rgba(30,45,74,0.5)", border: "1px solid var(--border)", color: "var(--text)" }}
+                      style={{ background: "var(--btn-bg)", border: "1px solid var(--border)", color: "var(--text)" }}
                     />
                     <button
                       type="button"
@@ -942,7 +942,7 @@ export default function GitPage() {
                       disabled={!newWorktreeName.trim() || loading}
                       className="px-4 py-2 rounded text-sm font-medium flex items-center justify-center"
                       style={{
-                        background: newWorktreeName.trim() ? "rgba(0,255,136,0.2)" : "rgba(30,45,74,0.5)",
+                        background: newWorktreeName.trim() ? "rgba(0,255,136,0.2)" : "var(--btn-bg)",
                         border: "1px solid var(--border)",
                         color: newWorktreeName.trim() ? "var(--green)" : "var(--dim)",
                         minWidth: "70px",

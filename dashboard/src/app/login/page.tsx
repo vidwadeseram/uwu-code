@@ -45,7 +45,7 @@ export default function LoginPage() {
 
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "#0a0e1a" }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
         <span
           className="spinner w-8 h-8"
           style={{ border: "2px solid rgba(0,255,136,0.15)", borderTopColor: "#00ff88" }}
@@ -55,7 +55,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "#0a0e1a" }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: "var(--bg)" }}>
       <div className="w-full max-w-sm flex flex-col gap-6 fade-in">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
@@ -81,7 +81,7 @@ export default function LoginPage() {
         <form
           onSubmit={submit}
           className="flex flex-col gap-4 p-6 rounded-xl"
-          style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+          style={{ background: "var(--card)", border: "1px solid var(--border)" }}
         >
           <div className="flex flex-col gap-1.5">
             <label className="text-xs" htmlFor="username" style={{ color: "#4a5568" }}>Username</label>
@@ -94,9 +94,9 @@ export default function LoginPage() {
               required
               className="px-3 py-2 rounded-lg text-sm outline-none"
               style={{
-                background: "rgba(10,14,26,0.8)",
-                border: "1px solid rgba(30,45,74,0.8)",
-                color: "#e2e8f0",
+                background: "var(--input-bg)",
+                border: "1px solid var(--input-border)",
+                color: "var(--text)",
               }}
             />
           </div>
@@ -112,9 +112,9 @@ export default function LoginPage() {
               required
               className="px-3 py-2 rounded-lg text-sm outline-none"
               style={{
-                background: "rgba(10,14,26,0.8)",
-                border: "1px solid rgba(30,45,74,0.8)",
-                color: "#e2e8f0",
+                background: "var(--input-bg)",
+                border: "1px solid var(--input-border)",
+                color: "var(--text)",
               }}
             />
           </div>
@@ -130,7 +130,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full py-2.5 rounded-lg text-sm font-semibold transition-opacity"
             style={{
-              background: loading ? "rgba(30,45,74,0.5)" : "rgba(0,255,136,0.15)",
+              background: loading ? "var(--btn-bg)" : "rgba(0,255,136,0.15)",
               color: loading ? "#4a5568" : "#00ff88",
               border: "1px solid rgba(0,255,136,0.3)",
               cursor: loading ? "not-allowed" : "pointer",

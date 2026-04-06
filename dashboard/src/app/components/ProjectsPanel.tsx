@@ -129,7 +129,7 @@ function CloneForm({ onClose, onCloned, existingNames }: CloneFormProps) {
         style={{
           background: "rgba(10, 14, 26, 0.8)",
           border: "1px solid rgba(30, 45, 74, 0.8)",
-          color: "#e2e8f0",
+          color: "var(--text)",
         }}
         onFocus={(e) =>
           (e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.4)")
@@ -147,7 +147,7 @@ function CloneForm({ onClose, onCloned, existingNames }: CloneFormProps) {
           style={{
             background: "rgba(10, 14, 26, 0.8)",
             border: "1px solid rgba(30, 45, 74, 0.8)",
-            color: destOption ? "#e2e8f0" : "#64748b",
+            color: destOption ? "var(--text)" : "#64748b",
           }}
           onFocus={(e) =>
             (e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.4)")
@@ -179,7 +179,7 @@ function CloneForm({ onClose, onCloned, existingNames }: CloneFormProps) {
             style={{
               background: "rgba(10, 14, 26, 0.8)",
               border: "1px solid rgba(0, 212, 255, 0.3)",
-              color: "#e2e8f0",
+              color: "var(--text)",
             }}
             onFocus={(e) =>
               (e.currentTarget.style.borderColor = "rgba(0, 212, 255, 0.5)")
@@ -469,8 +469,8 @@ export default function ProjectsPanel({ data, onRefresh }: Props) {
               {[1, 2].map((i) => (
                 <div key={i} className="card animate-pulse" style={{ height: 72 }}>
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <div className="w-7 h-7 rounded" style={{ background: "#1e2d4a" }} />
-                    <div className="h-4 rounded" style={{ background: "#1e2d4a", width: "35%" }} />
+                    <div className="w-7 h-7 rounded" style={{ background: "var(--border)" }} />
+                    <div className="h-4 rounded" style={{ background: "var(--border)", width: "35%" }} />
                   </div>
                 </div>
               ))}
@@ -530,7 +530,7 @@ function ProjectRow({
         <div className="flex items-center gap-2 flex-wrap">
           <span
             className="font-mono font-semibold text-sm"
-            style={{ color: "#e2e8f0" }}
+            style={{ color: "var(--text)" }}
           >
             {project.name}
           </span>
@@ -564,7 +564,7 @@ function ProjectRow({
         {project.remoteUrl && (
           <span
             className="font-mono text-xs truncate"
-            style={{ color: "#94a3b8" }}
+            style={{ color: "var(--dim)" }}
             title={project.remoteUrl}
           >
             {truncateUrl(project.remoteUrl)}
@@ -621,7 +621,7 @@ function ProjectRow({
           disabled={deleting}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all"
           style={{
-            background: deleting ? "rgba(30,45,74,0.5)" : "rgba(255,68,68,0.1)",
+            background: deleting ? "var(--btn-bg)" : "rgba(255,68,68,0.1)",
             border: "1px solid rgba(255,68,68,0.3)",
             color: deleting ? "#4a5568" : "#ff4444",
           }}

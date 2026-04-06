@@ -118,12 +118,12 @@ function ReportModal({ task, onClose }: { task: Task; onClose: () => void }) {
     >
       <div
         className="w-full max-w-4xl max-h-[85vh] flex flex-col rounded-lg overflow-hidden"
-        style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+        style={{ background: "var(--card)", border: "1px solid var(--border)" }}
       >
         {/* Header */}
         <div
           className="flex items-center justify-between px-5 py-4 border-b flex-shrink-0"
-          style={{ borderColor: "#1e2d4a" }}
+          style={{ borderColor: "var(--border)" }}
         >
           <div className="flex items-center gap-3 min-w-0">
             <span
@@ -136,7 +136,7 @@ function ReportModal({ task, onClose }: { task: Task; onClose: () => void }) {
             >
               {task.status.replace("_", " ")}
             </span>
-            <span className="font-semibold text-sm truncate" style={{ color: "#e2e8f0" }}>
+            <span className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>
               {task.title}
             </span>
           </div>
@@ -144,7 +144,7 @@ function ReportModal({ task, onClose }: { task: Task; onClose: () => void }) {
             onClick={onClose}
             type="button"
             className="text-xs px-2 py-1 rounded ml-3 flex-shrink-0"
-            style={{ background: "rgba(30,45,74,0.6)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+            style={{ background: "var(--surface)", color: "var(--dim)", border: "1px solid var(--border)" }}
           >
             ✕ Close
           </button>
@@ -153,10 +153,10 @@ function ReportModal({ task, onClose }: { task: Task; onClose: () => void }) {
         {/* Meta */}
         <div
           className="flex flex-wrap gap-4 px-5 py-3 text-xs border-b flex-shrink-0"
-          style={{ borderColor: "#1e2d4a", color: "#94a3b8" }}
+          style={{ borderColor: "var(--border)", color: "var(--dim)" }}
         >
           <span>Type: <span style={{ color: task.type === "coding" ? "#00d4ff" : "#a855f7" }}>{task.type}</span></span>
-          {task.workspace && <span>Workspace: <span style={{ color: "#e2e8f0" }} className="font-mono">{task.workspace}</span></span>}
+          {task.workspace && <span>Workspace: <span style={{ color: "var(--text)" }} className="font-mono">{task.workspace}</span></span>}
           {task.preferred_tool && <span>Tool: <span style={{ color: "#ffd700" }}>{task.preferred_tool}</span></span>}
           <span>Created: {fmtDate(task.created_at)}</span>
           {task.started_at && <span>Started: {fmtDate(task.started_at)}</span>}
@@ -164,9 +164,9 @@ function ReportModal({ task, onClose }: { task: Task; onClose: () => void }) {
         </div>
 
         {/* Task description */}
-        <div className="px-5 py-3 border-b flex-shrink-0" style={{ borderColor: "#1e2d4a" }}>
+        <div className="px-5 py-3 border-b flex-shrink-0" style={{ borderColor: "var(--border)" }}>
           <div className="text-xs mb-1" style={{ color: "#4a5568" }}>Task</div>
-          <div className="text-sm" style={{ color: "#94a3b8" }}>{task.description}</div>
+          <div className="text-sm" style={{ color: "var(--dim)" }}>{task.description}</div>
         </div>
 
         {/* Report */}
@@ -174,7 +174,7 @@ function ReportModal({ task, onClose }: { task: Task; onClose: () => void }) {
           {task.report ? (
             <pre
               className="text-xs leading-relaxed whitespace-pre-wrap font-mono"
-              style={{ color: "#e2e8f0" }}
+              style={{ color: "var(--text)" }}
             >
               {task.report}
             </pre>
@@ -204,8 +204,8 @@ function TaskCard({
   onViewReport: () => void;
   onQueueNow: () => void;
 }) {
-  const color = STATUS_COLOR[task.status] ?? "#94a3b8";
-  const bg    = STATUS_BG[task.status]    ?? "rgba(30,45,74,0.2)";
+  const color = STATUS_COLOR[task.status] ?? "var(--dim)";
+  const bg    = STATUS_BG[task.status]    ?? "var(--hover-bg)";
   const isActive = ["pending", "running", "scheduled", "rate_limited"].includes(task.status);
 
   return (
@@ -222,7 +222,7 @@ function TaskCard({
           ) : (
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
           )}
-          <span className="font-semibold text-sm truncate" style={{ color: "#e2e8f0" }}>
+          <span className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>
             {task.title}
           </span>
         </div>
@@ -250,14 +250,14 @@ function TaskCard({
       </div>
 
       {/* Description preview */}
-      <div className="text-xs leading-relaxed line-clamp-2" style={{ color: "#94a3b8" }}>
+      <div className="text-xs leading-relaxed line-clamp-2" style={{ color: "var(--dim)" }}>
         {task.description}
       </div>
 
       {/* Meta row */}
       <div className="flex flex-wrap items-center gap-3 text-xs" style={{ color: "#4a5568" }}>
         {task.workspace && (
-          <span className="font-mono truncate max-w-48" style={{ color: "#94a3b8" }}>
+          <span className="font-mono truncate max-w-48" style={{ color: "var(--dim)" }}>
             📁 {task.workspace.split("/").slice(-2).join("/")}
           </span>
         )}
@@ -354,9 +354,9 @@ function TaskCard({
 // ── New Task Form ─────────────────────────────────────────────────────────────
 
 const INPUT = {
-  background: "rgba(10,14,26,0.8)",
-  border: "1px solid rgba(30,45,74,0.8)",
-  color: "#e2e8f0",
+  background: "var(--input-bg)",
+  border: "1px solid var(--input-border)",
+  color: "var(--text)",
   borderRadius: "6px",
   padding: "8px 12px",
   fontSize: "0.8rem",
@@ -578,9 +578,9 @@ function NewTaskForm({
               onClick={() => setScheduleMode(mode.key)}
               className="py-2 rounded text-xs font-medium transition-all"
               style={{
-                background: scheduleMode === mode.key ? "rgba(249,115,22,0.15)" : "rgba(30,45,74,0.3)",
-                color: scheduleMode === mode.key ? "#f59e0b" : "#94a3b8",
-                border: `1px solid ${scheduleMode === mode.key ? "rgba(249,115,22,0.4)" : "rgba(30,45,74,0.5)"}`,
+                background: scheduleMode === mode.key ? "rgba(249,115,22,0.15)" : "var(--hover-bg)",
+                color: scheduleMode === mode.key ? "#f59e0b" : "var(--dim)",
+                border: `1px solid ${scheduleMode === mode.key ? "rgba(249,115,22,0.4)" : "var(--btn-bg)"}`,
               }}
             >
               {mode.label}
@@ -670,9 +670,9 @@ function NewTaskForm({
                 }}
                 className="text-xs px-2 py-0.5 rounded transition-colors"
                 style={{
-                  background: useWorktree ? "rgba(168,85,247,0.12)" : "rgba(30,45,74,0.3)",
+                  background: useWorktree ? "rgba(168,85,247,0.12)" : "var(--hover-bg)",
                   color: useWorktree ? "#a855f7" : "#4a5568",
-                  border: `1px solid ${useWorktree ? "rgba(168,85,247,0.3)" : "rgba(30,45,74,0.5)"}`,
+                  border: `1px solid ${useWorktree ? "rgba(168,85,247,0.3)" : "var(--btn-bg)"}`,
                 }}
               >
                 {useWorktree ? "⎇ Worktree" : "Use Worktree"}
@@ -712,9 +712,9 @@ function NewTaskForm({
                 <div
                   className="px-3 py-2 rounded text-xs flex-1 font-mono"
                   style={{
-                    background: "rgba(10,14,26,0.8)",
-                    border: "1px solid rgba(30,45,74,0.8)",
-                    color: "#e2e8f0",
+                    background: "var(--input-bg)",
+                    border: "1px solid var(--input-border)",
+                    color: "var(--text)",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
@@ -767,7 +767,7 @@ function NewTaskForm({
           disabled={loading}
           className="flex-1 py-2 rounded text-sm font-semibold transition-opacity"
           style={{
-            background: loading ? "rgba(30,45,74,0.5)" : "rgba(0,255,136,0.15)",
+            background: loading ? "var(--btn-bg)" : "rgba(0,255,136,0.15)",
             color: loading ? "#4a5568" : "#00ff88",
             border: "1px solid rgba(0,255,136,0.3)",
             cursor: loading ? "not-allowed" : "pointer",
@@ -783,7 +783,7 @@ function NewTaskForm({
           onClick={onCancel}
           type="button"
           className="px-4 py-2 rounded text-sm transition-opacity hover:opacity-70"
-          style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}
+          style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
         >
           Cancel
         </button>
@@ -801,21 +801,21 @@ function NewTaskForm({
         >
           <div
             className="w-full max-w-2xl max-h-[75vh] flex flex-col rounded-lg overflow-hidden"
-            style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+            style={{ background: "var(--card)", border: "1px solid var(--border)" }}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "#1e2d4a" }}>
+            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
               <div className="text-sm font-semibold" style={{ color: "#00d4ff" }}>Select Workspace Folder</div>
               <button
                 type="button"
                 onClick={() => setPickerOpen(false)}
                 className="text-xs px-2 py-1 rounded"
-                style={{ background: "rgba(30,45,74,0.6)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+                style={{ background: "var(--surface)", color: "var(--dim)", border: "1px solid var(--border)" }}
               >
                 ✕ Close
               </button>
             </div>
 
-            <div className="px-4 py-3 border-b" style={{ borderColor: "#1e2d4a" }}>
+            <div className="px-4 py-3 border-b" style={{ borderColor: "var(--border)" }}>
               <input
                 type="text"
                 value={pickerSearch}
@@ -855,14 +855,14 @@ function NewTaskForm({
                     }}
                     className="w-full text-left px-3 py-2 rounded transition-opacity hover:opacity-85"
                     style={{
-                      background: "rgba(30,45,74,0.35)",
-                      border: "1px solid rgba(30,45,74,0.7)",
+                      background: "var(--btn-bg)",
+                      border: "1px solid var(--input-border)",
                     }}
                   >
                     <div className="text-xs font-semibold" style={{ color: opt.kind === "project" ? "#00d4ff" : "#ffd700" }}>
                       {opt.name}
                     </div>
-                    <div className="text-xs font-mono" style={{ color: "#94a3b8" }}>
+                    <div className="text-xs font-mono" style={{ color: "var(--dim)" }}>
                       {opt.path}
                     </div>
                   </button>
@@ -1130,9 +1130,9 @@ export default function SchedulerPage() {
             type="button"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-semibold transition-all"
             style={{
-              background: showForm ? "rgba(30,45,74,0.5)" : "rgba(0,255,136,0.12)",
-              color: showForm ? "#94a3b8" : "#00ff88",
-              border: `1px solid ${showForm ? "rgba(30,45,74,0.7)" : "rgba(0,255,136,0.3)"}`,
+              background: showForm ? "var(--btn-bg)" : "rgba(0,255,136,0.12)",
+              color: showForm ? "var(--dim)" : "#00ff88",
+              border: `1px solid ${showForm ? "var(--input-border)" : "rgba(0,255,136,0.3)"}`,
             }}
           >
             {showForm ? "✕ Cancel" : "+ New Task"}
@@ -1161,7 +1161,7 @@ export default function SchedulerPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "#1e2d4a" }}>
+      <div className="flex gap-1 border-b overflow-x-auto" style={{ borderColor: "var(--border)" }}>
         {([
           { key: "active", label: `Active (${active.length})` },
           { key: "all", label: `All (${tasks.length})` },
@@ -1172,7 +1172,7 @@ export default function SchedulerPage() {
             type="button"
             className="px-4 py-2 text-sm font-medium transition-colors relative"
             style={{
-              color: tab === t.key ? "#e2e8f0" : "#4a5568",
+              color: tab === t.key ? "var(--text)" : "#4a5568",
               borderBottom: tab === t.key ? "2px solid #ffd700" : "2px solid transparent",
             }}
           >

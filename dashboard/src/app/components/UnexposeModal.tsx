@@ -54,7 +54,7 @@ export default function UnexposeModal({
       >
         <div
           className="flex items-center justify-between px-4 sm:px-5 py-4"
-          style={{ borderBottom: "1px solid #1e2d4a" }}
+          style={{ borderBottom: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-3">
             <div
@@ -80,10 +80,10 @@ export default function UnexposeModal({
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
                 Stop Port Exposure
               </h3>
-              <p className="text-xs" style={{ color: "#94a3b8" }}>
+              <p className="text-xs" style={{ color: "var(--dim)" }}>
                 port {port}
               </p>
             </div>
@@ -106,17 +106,17 @@ export default function UnexposeModal({
         <div className="px-4 sm:px-5 py-5 space-y-4">
           <div
             className="rounded-lg p-3 space-y-2"
-            style={{ background: "rgba(30, 45, 74, 0.4)", border: "1px solid #1e2d4a" }}
+            style={{ background: "rgba(30, 45, 74, 0.4)", border: "1px solid var(--border)" }}
           >
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
-              <span style={{ color: "#94a3b8" }}>Removing rule</span>
+              <span style={{ color: "var(--dim)" }}>Removing rule</span>
               <span className="font-mono font-semibold break-all" style={{ color: "#a855f7" }}>
                 ufw delete allow {port}/tcp
               </span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
-              <span style={{ color: "#94a3b8" }}>Public URL</span>
-              <span className="font-mono text-xs break-all" style={{ color: "#94a3b8" }}>
+              <span style={{ color: "var(--dim)" }}>Public URL</span>
+              <span className="font-mono text-xs break-all" style={{ color: "var(--dim)" }}>
                 http://{publicIp}:{port}
               </span>
             </div>
@@ -149,14 +149,14 @@ export default function UnexposeModal({
                 )}
                 {result.success ? "Exposure removed" : "Warning"}
               </div>
-              <p style={{ color: "#94a3b8" }}>{result.message}</p>
+              <p style={{ color: "var(--dim)" }}>{result.message}</p>
             </div>
           )}
         </div>
 
         <div
           className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4"
-          style={{ borderTop: "1px solid #1e2d4a" }}
+          style={{ borderTop: "1px solid var(--border)" }}
         >
           <button
             type="button"
@@ -165,10 +165,10 @@ export default function UnexposeModal({
             style={{
               background: "rgba(30, 45, 74, 0.5)",
               border: "1px solid rgba(30, 45, 74, 0.8)",
-              color: "#94a3b8",
+              color: "var(--dim)",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#e2e8f0")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--dim)")}
           >
             Close
           </button>
@@ -184,7 +184,7 @@ export default function UnexposeModal({
                   ? "rgba(168, 85, 247, 0.1)"
                   : "linear-gradient(135deg, rgba(168,85,247,0.25) 0%, rgba(255,68,68,0.15) 100%)",
                 border: "1px solid rgba(168, 85, 247, 0.4)",
-                color: loading ? "#4a5568" : "#e2e8f0",
+                color: loading ? "#4a5568" : "var(--text)",
                 cursor: loading ? "not-allowed" : "pointer",
               }}
             >

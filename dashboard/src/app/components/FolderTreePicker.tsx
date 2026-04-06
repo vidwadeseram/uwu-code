@@ -68,7 +68,7 @@ function TreeItem({
           <i
             aria-hidden="true"
             className="w-4 h-4 flex items-center justify-center flex-shrink-0 not-italic"
-            style={{ color: "#94a3b8" }}
+            style={{ color: "var(--dim)" }}
             onClick={(e) => {
               e.stopPropagation();
               onToggle(node.path);
@@ -119,7 +119,7 @@ function TreeItem({
 
         <span
           className="text-xs truncate"
-          style={{ color: isSelected ? "#00d4ff" : "#e2e8f0" }}
+          style={{ color: isSelected ? "#00d4ff" : "var(--text)" }}
         >
           {node.name}
         </span>
@@ -291,8 +291,8 @@ export default function FolderTreePicker({
         onClick={() => setOpen((prev) => !prev)}
         className={`flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs transition-colors w-full ${compact ? "sm:max-w-[260px]" : "sm:max-w-[360px]"}`}
         style={{
-          background: "rgba(30,45,74,0.5)",
-          color: value ? "#94a3b8" : "#4a5568",
+          background: "var(--btn-bg)",
+          color: value ? "var(--dim)" : "#4a5568",
           border: open ? "1px solid rgba(0,212,255,0.4)" : "1px solid #1e2d4a",
         }}
         title={value || placeholder}
@@ -327,14 +327,14 @@ export default function FolderTreePicker({
         <div
           className="absolute right-0 top-full mt-1 z-50 w-[min(20rem,calc(100vw-2rem))] sm:w-80 rounded-lg overflow-hidden shadow-2xl"
           style={{
-            background: "#0f1629",
-            border: "1px solid #1e2d4a",
+            background: "var(--card)",
+            border: "1px solid var(--border)",
             boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
           }}
         >
           <div
             className="flex items-center justify-between px-3 py-2 border-b"
-            style={{ borderColor: "#1e2d4a" }}
+            style={{ borderColor: "var(--border)" }}
           >
             <span className="text-xs font-semibold" style={{ color: "#00d4ff" }}>
               Browse Workspaces
@@ -382,7 +382,7 @@ export default function FolderTreePicker({
           {value && (
             <div
               className="px-3 py-2 border-t text-xs font-mono truncate"
-              style={{ borderColor: "#1e2d4a", color: "#4a5568" }}
+              style={{ borderColor: "var(--border)", color: "#4a5568" }}
               title={value}
             >
               {value}

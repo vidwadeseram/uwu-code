@@ -45,7 +45,7 @@ function StatCard({
           {value}
         </div>
         {sub && (
-          <div className="text-xs truncate mt-0.5" style={{ color: "#94a3b8" }}>
+          <div className="text-xs truncate mt-0.5" style={{ color: "var(--dim)" }}>
             {sub}
           </div>
         )}
@@ -58,7 +58,7 @@ function MemoryBar({ percent }: { percent: number }) {
   const color =
     percent > 90 ? "#ff4444" : percent > 70 ? "#ffd700" : "#00ff88";
   return (
-    <div className="w-full rounded-full h-1.5 mt-1" style={{ background: "#1e2d4a" }}>
+    <div className="w-full rounded-full h-1.5 mt-1" style={{ background: "var(--border)" }}>
       <div
         className="h-1.5 rounded-full transition-all duration-500"
         style={{ width: `${percent}%`, background: color }}
@@ -75,7 +75,7 @@ export default function SystemHeader({
   onRefresh,
 }: Props) {
   const skeletonClass = "animate-pulse rounded" as const;
-  const skeletonStyle = { background: "#1e2d4a" };
+  const skeletonStyle = { background: "var(--border)" };
 
   const formatRefresh = (d: Date) => {
     return d.toLocaleTimeString("en-US", {
@@ -245,7 +245,7 @@ export default function SystemHeader({
                   {data.memory.percent}% used
                 </div>
                 <MemoryBar percent={data.memory.percent} />
-                <div className="text-xs mt-1" style={{ color: "#94a3b8" }}>
+                <div className="text-xs mt-1" style={{ color: "var(--dim)" }}>
                   {data.memory.used} / {data.memory.total} MB
                 </div>
               </>

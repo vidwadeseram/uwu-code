@@ -107,11 +107,11 @@ export default function CorePanel({
                   <div
                     key={i}
                     className="h-10 rounded"
-                    style={{ background: "#1e2d4a" }}
+                    style={{ background: "var(--border)" }}
                   />
                 ))}
               </div>
-              <div className="h-24 rounded" style={{ background: "#1e2d4a" }} />
+              <div className="h-24 rounded" style={{ background: "var(--border)" }} />
             </div>
           ) : (
             <>
@@ -143,7 +143,7 @@ export default function CorePanel({
                       <StatusDot active={svc.active} status={svc.status} />
                       <span
                         className="font-mono text-xs font-medium flex-1 truncate"
-                        style={{ color: svc.active ? "#e2e8f0" : "#94a3b8" }}
+                        style={{ color: svc.active ? "var(--text)" : "var(--dim)" }}
                       >
                         {svc.name}
                       </span>
@@ -222,7 +222,7 @@ export default function CorePanel({
                             <td>
                               <span
                                 className="font-mono text-xs"
-                                style={{ color: "#94a3b8" }}
+                                style={{ color: "var(--dim)" }}
                                 title={c.ports}
                               >
                                 {c.ports

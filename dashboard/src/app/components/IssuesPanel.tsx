@@ -94,7 +94,7 @@ function ProjectPanel({
     : 0;
 
   return (
-    <div className="card" style={{ border: "1px solid rgba(30,45,74,0.8)" }}>
+    <div className="card" style={{ border: "1px solid var(--input-border)" }}>
       <button
         type="button"
         onClick={onToggle}
@@ -106,7 +106,7 @@ function ProjectPanel({
             className="w-4 h-4 transition-transform"
             style={{
               transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-              color: "#94a3b8",
+              color: "var(--dim)",
             }}
             viewBox="0 0 24 24"
             fill="none"
@@ -118,7 +118,7 @@ function ProjectPanel({
           >
             <polyline points="9 18 15 12 9 6" />
           </svg>
-          <span className="font-semibold text-sm" style={{ color: "#e2e8f0" }}>
+          <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>
             {project.name || project.path.split("/").pop()}
           </span>
           {project.branch && (
@@ -153,9 +153,9 @@ function ProjectPanel({
             <span
               className="text-xs px-2 py-0.5 rounded"
               style={{
-                background: totalIssues > 0 ? "rgba(168,85,247,0.1)" : "rgba(30,45,74,0.3)",
+                background: totalIssues > 0 ? "rgba(168,85,247,0.1)" : "var(--hover-bg)",
                 color: totalIssues > 0 ? "#a855f7" : "#4a5568",
-                border: `1px solid ${totalIssues > 0 ? "rgba(168,85,247,0.2)" : "rgba(30,45,74,0.5)"}`,
+                border: `1px solid ${totalIssues > 0 ? "rgba(168,85,247,0.2)" : "var(--btn-bg)"}`,
               }}
             >
               {totalIssues} issue{totalIssues !== 1 ? "s" : ""}
@@ -178,7 +178,7 @@ function ProjectPanel({
           {loading && !data && (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="animate-pulse h-8 rounded" style={{ background: "rgba(30,45,74,0.3)" }} />
+                <div key={i} className="animate-pulse h-8 rounded" style={{ background: "var(--hover-bg)" }} />
               ))}
             </div>
           )}
@@ -265,19 +265,19 @@ function MilestoneSection({ milestoneGroup, repoOwner, repoName, onAddToQueue, a
   const isClosingMilestone = closingMilestoneId === milestone.id;
 
   return (
-    <div className="rounded overflow-hidden" style={{ border: "1px solid rgba(30,45,74,0.5)" }}>
+    <div className="rounded overflow-hidden" style={{ border: "1px solid var(--btn-bg)" }}>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-3 py-2"
-        style={{ background: "rgba(30,45,74,0.3)" }}
+        style={{ background: "var(--hover-bg)" }}
       >
         <div className="flex items-center gap-2">
           <svg
             className="w-3 h-3 transition-transform"
             style={{
               transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
-              color: "#94a3b8",
+              color: "var(--dim)",
             }}
             viewBox="0 0 24 24"
             fill="none"
@@ -321,7 +321,7 @@ function MilestoneSection({ milestoneGroup, repoOwner, repoName, onAddToQueue, a
           style={{
             background: "rgba(0,255,136,0.1)",
             color: "#00ff88",
-            borderTop: "1px solid rgba(30,45,74,0.5)",
+            borderTop: "1px solid var(--btn-bg)",
             border: "1px solid rgba(0,255,136,0.25)",
             cursor: isAddingMilestone ? "wait" : "pointer",
           }}
@@ -349,7 +349,7 @@ function MilestoneSection({ milestoneGroup, repoOwner, repoName, onAddToQueue, a
           style={{
             background: "rgba(255,68,68,0.1)",
             color: "#ff4444",
-            borderTop: "1px solid rgba(30,45,74,0.5)",
+            borderTop: "1px solid var(--btn-bg)",
             border: "1px solid rgba(255,68,68,0.25)",
             cursor: isClosingMilestone ? "wait" : "pointer",
           }}
@@ -411,7 +411,7 @@ function IssueRow({ issue, repoOwner, repoName, onAddToQueue, onCloseIssue, addi
         >
           #{issue.number}
         </span>
-        <span className="text-xs flex-1 line-clamp-2" style={{ color: "#e2e8f0" }}>
+        <span className="text-xs flex-1 line-clamp-2" style={{ color: "var(--text)" }}>
           {issue.title}
         </span>
         {issue.labels.length > 0 && (

@@ -81,7 +81,7 @@ export default function ExposeModal({
         {/* Header */}
         <div
           className="flex items-center justify-between px-4 sm:px-5 py-4"
-          style={{ borderBottom: "1px solid #1e2d4a" }}
+          style={{ borderBottom: "1px solid var(--border)" }}
         >
           <div className="flex items-center gap-3">
             <div
@@ -106,10 +106,10 @@ export default function ExposeModal({
               </svg>
             </div>
             <div>
-              <h3 className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>
+              <h3 className="text-sm font-semibold" style={{ color: "var(--text)" }}>
                 Expose Port
               </h3>
-              <p className="text-xs" style={{ color: "#94a3b8" }}>
+              <p className="text-xs" style={{ color: "var(--dim)" }}>
                 {port.processName} — port {port.port}
               </p>
             </div>
@@ -140,30 +140,30 @@ export default function ExposeModal({
           {/* Port info */}
           <div
             className="rounded-lg p-3 space-y-2"
-            style={{ background: "rgba(30, 45, 74, 0.4)", border: "1px solid #1e2d4a" }}
+            style={{ background: "rgba(30, 45, 74, 0.4)", border: "1px solid var(--border)" }}
           >
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
-              <span style={{ color: "#94a3b8" }}>Port</span>
+              <span style={{ color: "var(--dim)" }}>Port</span>
               <span className="font-mono font-semibold" style={{ color: "#00d4ff" }}>
                 {port.port}
               </span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
-              <span style={{ color: "#94a3b8" }}>Process</span>
-              <span className="font-mono break-all" style={{ color: "#e2e8f0" }}>
+              <span style={{ color: "var(--dim)" }}>Process</span>
+              <span className="font-mono break-all" style={{ color: "var(--text)" }}>
                 {port.processName}
                 {port.pid ? ` (${port.pid})` : ""}
               </span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
-              <span style={{ color: "#94a3b8" }}>Address</span>
-              <span className="font-mono break-all" style={{ color: "#e2e8f0" }}>
+              <span style={{ color: "var(--dim)" }}>Address</span>
+              <span className="font-mono break-all" style={{ color: "var(--text)" }}>
                 {port.address}
               </span>
             </div>
             {port.matchedSession && (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5 text-xs">
-                <span style={{ color: "#94a3b8" }}>Session</span>
+                <span style={{ color: "var(--dim)" }}>Session</span>
                 <span
                   className="font-mono break-all"
                   style={{ color: "#00ff88" }}
@@ -264,7 +264,7 @@ export default function ExposeModal({
                 )}
                 {result.success ? "Firewall rule added" : "Note"}
               </div>
-              <p style={{ color: "#94a3b8" }}>{result.message}</p>
+              <p style={{ color: "var(--dim)" }}>{result.message}</p>
               {result.ufwOutput && (
                 <pre
                   className="text-xs mt-1 p-2 rounded overflow-x-auto"
@@ -284,7 +284,7 @@ export default function ExposeModal({
         {/* Footer */}
         <div
           className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4"
-          style={{ borderTop: "1px solid #1e2d4a" }}
+          style={{ borderTop: "1px solid var(--border)" }}
         >
           <button
             type="button"
@@ -293,10 +293,10 @@ export default function ExposeModal({
             style={{
               background: "rgba(30, 45, 74, 0.5)",
               border: "1px solid rgba(30, 45, 74, 0.8)",
-              color: "#94a3b8",
+              color: "var(--dim)",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#e2e8f0")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#94a3b8")}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--dim)")}
           >
             Close
           </button>

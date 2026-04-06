@@ -24,9 +24,9 @@ interface Space {
 const COLORS = ["#00ff88", "#ff6b6b", "#4ecdc4", "#ffe66d", "#a855f7", "#3b82f6", "#f97316", "#ec4899"];
 
 const INPUT_STYLE = {
-  background: "rgba(10,14,26,0.8)",
-  border: "1px solid rgba(30,45,74,0.8)",
-  color: "#e2e8f0",
+  background: "var(--input-bg)",
+  border: "1px solid var(--input-border)",
+  color: "var(--text)",
   borderRadius: "6px",
   padding: "6px 10px",
   fontSize: "0.8rem",
@@ -287,7 +287,7 @@ export default function SpacesPage() {
               type="button"
               onClick={() => setShowNewSpace(false)}
               className="px-4 py-1.5 rounded text-sm"
-              style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}
+              style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
             >
               Cancel
             </button>
@@ -351,7 +351,7 @@ export default function SpacesPage() {
                     </div>
                     <div className="flex gap-2">
                       <button type="button" onClick={handleUpdateSpace} className="px-3 py-1.5 rounded text-xs font-medium" style={{ background: "rgba(0,255,136,0.15)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.3)" }}>Save</button>
-                      <button type="button" onClick={() => setEditingSpace(null)} className="px-3 py-1.5 rounded text-xs" style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}>Cancel</button>
+                      <button type="button" onClick={() => setEditingSpace(null)} className="px-3 py-1.5 rounded text-xs" style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}>Cancel</button>
                     </div>
                   </div>
                 ) : (
@@ -366,14 +366,14 @@ export default function SpacesPage() {
                           {space.name.charAt(0).toUpperCase()}
                         </span>
                         <div className="min-w-0">
-                          <div className="font-semibold text-sm truncate" style={{ color: "#e2e8f0" }}>{space.name}</div>
+                          <div className="font-semibold text-sm truncate" style={{ color: "var(--text)" }}>{space.name}</div>
                           {space.description && (
                             <div className="text-xs truncate" style={{ color: "#4a5568" }}>{space.description}</div>
                           )}
                         </div>
                       </div>
                       <div className="flex gap-1 flex-shrink-0">
-                        <button type="button" aria-label="Edit space" onClick={() => setEditingSpace(space)} className="px-2 py-1 text-xs rounded" style={{ color: "#4a5568" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#94a3b8")} onMouseLeave={(e) => (e.currentTarget.style.color = "#4a5568")}>Edit</button>
+                        <button type="button" aria-label="Edit space" onClick={() => setEditingSpace(space)} className="px-2 py-1 text-xs rounded" style={{ color: "#4a5568" }} onMouseEnter={(e) => (e.currentTarget.style.color = "var(--dim)")} onMouseLeave={(e) => (e.currentTarget.style.color = "#4a5568")}>Edit</button>
                         <button type="button" aria-label="Delete space" onClick={() => handleDeleteSpace(space.id)} className="px-2 py-1 text-xs rounded" style={{ color: "#4a5568" }} onMouseEnter={(e) => (e.currentTarget.style.color = "#ff4444")} onMouseLeave={(e) => (e.currentTarget.style.color = "#4a5568")}>Delete</button>
                       </div>
                     </div>
@@ -384,10 +384,10 @@ export default function SpacesPage() {
                       {folders.map((folder) => {
                         const folderProjects = getInFolder(space, folder);
                         return (
-                          <div key={folder} className="rounded overflow-hidden" style={{ border: "1px solid rgba(30,45,74,0.6)" }}>
+                          <div key={folder} className="rounded overflow-hidden" style={{ border: "1px solid var(--surface)" }}>
                             <div
                               className="flex items-center justify-between px-3 py-1.5"
-                              style={{ background: "rgba(30,45,74,0.4)", borderBottom: "1px solid rgba(30,45,74,0.6)" }}
+                              style={{ background: "var(--btn-bg)", borderBottom: "1px solid var(--surface)" }}
                             >
                               <div className="flex items-center gap-1.5">
                                 <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke={space.color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -397,7 +397,7 @@ export default function SpacesPage() {
                                 <span className="text-xs" style={{ color: "#4a5568" }}>({folderProjects.length})</span>
                               </div>
                             </div>
-                            <div className="divide-y" style={{ borderColor: "rgba(30,45,74,0.4)" }}>
+                            <div className="divide-y" style={{ borderColor: "var(--btn-bg)" }}>
                               {folderProjects.map((project) => (
                                 <ProjectRow
                                   key={project.id}
@@ -438,7 +438,7 @@ export default function SpacesPage() {
 
                       {/* Add project form */}
                       {isAdding ? (
-                        <div className="rounded p-3 space-y-2" style={{ background: "rgba(30,45,74,0.3)", border: "1px solid rgba(30,45,74,0.6)" }}>
+                        <div className="rounded p-3 space-y-2" style={{ background: "var(--hover-bg)", border: "1px solid var(--surface)" }}>
                           <select
                             value={addProjectId}
                             onChange={(e) => setAddProjectId(e.target.value)}
@@ -474,7 +474,7 @@ export default function SpacesPage() {
                               type="button"
                               onClick={() => { setAddingToSpace(null); setAddProjectId(""); setAddFolderName(""); }}
                               className="px-3 py-1.5 rounded text-xs"
-                              style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}
+                              style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
                             >
                               Cancel
                             </button>
@@ -485,7 +485,7 @@ export default function SpacesPage() {
                           type="button"
                           onClick={() => { setAddingToSpace(space); setAddProjectId(""); setAddFolderName(""); }}
                           className="w-full py-1.5 rounded text-xs transition-opacity hover:opacity-80"
-                          style={{ background: "rgba(30,45,74,0.2)", color: "#4a5568", border: "1px dashed rgba(30,45,74,0.6)" }}
+                          style={{ background: "var(--hover-bg)", color: "#4a5568", border: "1px dashed var(--surface)" }}
                         >
                           + Add Repo
                         </button>
@@ -519,13 +519,13 @@ function ProjectRow({
   const [newFolder, setNewFolder] = useState("");
 
   return (
-    <div className="flex items-center justify-between px-2 py-1.5 gap-2 group" style={{ background: "rgba(10,14,26,0.2)" }}>
+    <div className="flex items-center justify-between px-2 py-1.5 gap-2 group" style={{ background: "var(--hover-bg)" }}>
       <div className="flex items-center gap-2 min-w-0">
         <svg className="w-3 h-3 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="#4a5568" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-        <span className="text-xs truncate" style={{ color: "#e2e8f0" }}>{project.name}</span>
+        <span className="text-xs truncate" style={{ color: "var(--text)" }}>{project.name}</span>
       </div>
       <div className="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
         {showMove ? (
@@ -537,7 +537,7 @@ function ProjectRow({
               placeholder="Folder or blank"
               list={`move-folders-${project.id}`}
               className="text-xs px-1.5 py-0.5 rounded w-24"
-              style={{ background: "rgba(30,45,74,0.6)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0", outline: "none" }}
+              style={{ background: "var(--surface)", border: "1px solid var(--input-border)", color: "var(--text)", outline: "none" }}
             />
             <datalist id={`move-folders-${project.id}`}>
               {folders.filter((f) => f !== project.folderName).map((f) => <option key={f} value={f} />)}

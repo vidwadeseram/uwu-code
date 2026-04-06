@@ -41,7 +41,7 @@ function ScriptCard({
   return (
     <div
       className="card transition-all"
-      style={{ border: "1px solid rgba(30,45,74,0.8)" }}
+      style={{ border: "1px solid var(--input-border)" }}
     >
       <button
         type="button"
@@ -55,7 +55,7 @@ function ScriptCard({
               className="w-4 h-4 transition-transform"
               style={{
                 transform: expanded ? "rotate(90deg)" : "rotate(0deg)",
-                color: "#94a3b8",
+                color: "var(--dim)",
               }}
               viewBox="0 0 24 24"
               fill="none"
@@ -65,7 +65,7 @@ function ScriptCard({
             >
               <polyline points="9 18 15 12 9 6" />
             </svg>
-            <span className="font-semibold text-sm" style={{ color: "#e2e8f0" }}>
+            <span className="font-semibold text-sm" style={{ color: "var(--text)" }}>
               {script.name}
             </span>
             {script.isFavorite && (
@@ -76,9 +76,9 @@ function ScriptCard({
             <span
               className="text-xs px-2 py-0.5 rounded"
               style={{
-                background: isRunning ? "rgba(0,212,255,0.1)" : "rgba(30,45,74,0.3)",
+                background: isRunning ? "rgba(0,212,255,0.1)" : "var(--hover-bg)",
                 color: isRunning ? "#00d4ff" : "#4a5568",
-                border: `1px solid ${isRunning ? "rgba(0,212,255,0.2)" : "rgba(30,45,74,0.5)"}`,
+                border: `1px solid ${isRunning ? "rgba(0,212,255,0.2)" : "var(--btn-bg)"}`,
               }}
             >
               {isRunning ? (
@@ -109,9 +109,9 @@ function ScriptCard({
 
           <div
             className="rounded p-3 font-mono text-xs overflow-x-auto"
-            style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.5)" }}
+            style={{ background: "var(--input-bg)", border: "1px solid var(--btn-bg)" }}
           >
-            <pre style={{ color: "#94a3b8", margin: 0, whiteSpace: "pre-wrap" }}>
+            <pre style={{ color: "var(--dim)", margin: 0, whiteSpace: "pre-wrap" }}>
               {script.content}
             </pre>
           </div>
@@ -122,7 +122,7 @@ function ScriptCard({
             </div>
           )}
 
-          <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: "rgba(30,45,74,0.5)" }}>
+          <div className="flex items-center gap-2 pt-2 border-t" style={{ borderColor: "var(--btn-bg)" }}>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRun(); }}
@@ -151,7 +151,7 @@ function ScriptCard({
               type="button"
               onClick={(e) => { e.stopPropagation(); onEdit(); }}
               className="px-3 py-1.5 rounded text-xs transition-opacity hover:opacity-80"
-              style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.6)" }}
+              style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--surface)" }}
             >
               Edit
             </button>
@@ -160,9 +160,9 @@ function ScriptCard({
               onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }}
               className="px-3 py-1.5 rounded text-xs transition-opacity hover:opacity-80"
               style={{
-                background: script.isFavorite ? "rgba(255,215,0,0.1)" : "rgba(30,45,74,0.4)",
-                color: script.isFavorite ? "#ffd700" : "#94a3b8",
-                border: `1px solid ${script.isFavorite ? "rgba(255,215,0,0.25)" : "rgba(30,45,74,0.6)"}`,
+                background: script.isFavorite ? "rgba(255,215,0,0.1)" : "var(--btn-bg)",
+                color: script.isFavorite ? "#ffd700" : "var(--dim)",
+                border: `1px solid ${script.isFavorite ? "rgba(255,215,0,0.25)" : "var(--surface)"}`,
               }}
             >
               {script.isFavorite ? "★ Favorited" : "☆ Favorite"}
@@ -201,15 +201,15 @@ function EditModal({
     >
       <div
         className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-lg overflow-hidden"
-        style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+        style={{ background: "var(--card)", border: "1px solid var(--border)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#1e2d4a" }}>
-          <span className="font-semibold" style={{ color: "#e2e8f0" }}>Edit Script</span>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
+          <span className="font-semibold" style={{ color: "var(--text)" }}>Edit Script</span>
           <button
             type="button"
             onClick={onClose}
             className="text-xs px-2 py-1 rounded"
-            style={{ background: "rgba(30,45,74,0.6)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+            style={{ background: "var(--surface)", color: "var(--dim)", border: "1px solid var(--border)" }}
           >
             ✕ Close
           </button>
@@ -224,7 +224,7 @@ function EditModal({
               value={edited.name}
               onChange={(e) => setEdited({ ...edited, name: e.target.value })}
               className="w-full px-3 py-2 rounded text-sm"
-              style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--input-border)", color: "var(--text)" }}
             />
           </div>
 
@@ -237,7 +237,7 @@ function EditModal({
               onChange={(e) => setEdited({ ...edited, description: e.target.value })}
               placeholder="Optional description..."
               className="w-full px-3 py-2 rounded text-sm"
-              style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--input-border)", color: "var(--text)" }}
             />
           </div>
 
@@ -248,18 +248,18 @@ function EditModal({
               value={edited.content}
               onChange={(e) => setEdited({ ...edited, content: e.target.value })}
               className="w-full px-3 py-2 rounded text-sm font-mono resize-none"
-              style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0", minHeight: "200px" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--input-border)", color: "var(--text)", minHeight: "200px" }}
               spellCheck={false}
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "#1e2d4a" }}>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-2 rounded text-sm"
-            style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}
+            style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
           >
             Cancel
           </button>
@@ -292,15 +292,15 @@ function OutputModal({
     >
       <div
         className="w-full max-w-3xl max-h-[85vh] flex flex-col rounded-lg overflow-hidden"
-        style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+        style={{ background: "var(--card)", border: "1px solid var(--border)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#1e2d4a" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <span className="font-semibold" style={{ color: "#00ff88" }}>Script Output</span>
           <button
             type="button"
             onClick={onClose}
             className="text-xs px-2 py-1 rounded"
-            style={{ background: "rgba(30,45,74,0.6)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+            style={{ background: "var(--surface)", color: "var(--dim)", border: "1px solid var(--border)" }}
           >
             ✕ Close
           </button>
@@ -309,7 +309,7 @@ function OutputModal({
         <div className="flex-1 overflow-auto p-5">
           <pre
             className="text-sm font-mono whitespace-pre-wrap"
-            style={{ color: "#e2e8f0" }}
+            style={{ color: "var(--text)" }}
           >
             {output}
           </pre>
@@ -338,15 +338,15 @@ function NewScriptModal({
     >
       <div
         className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-lg overflow-hidden"
-        style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+        style={{ background: "var(--card)", border: "1px solid var(--border)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#1e2d4a" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <span className="font-semibold" style={{ color: "#00d4ff" }}>New Script</span>
           <button
             type="button"
             onClick={onClose}
             className="text-xs px-2 py-1 rounded"
-            style={{ background: "rgba(30,45,74,0.6)", color: "#94a3b8", border: "1px solid #1e2d4a" }}
+            style={{ background: "var(--surface)", color: "var(--dim)", border: "1px solid var(--border)" }}
           >
             ✕ Close
           </button>
@@ -362,7 +362,7 @@ function NewScriptModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="My awesome script"
               className="w-full px-3 py-2 rounded text-sm"
-              style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--input-border)", color: "var(--text)" }}
             />
           </div>
 
@@ -375,7 +375,7 @@ function NewScriptModal({
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What does this script do?"
               className="w-full px-3 py-2 rounded text-sm"
-              style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--input-border)", color: "var(--text)" }}
             />
           </div>
 
@@ -386,18 +386,18 @@ function NewScriptModal({
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="w-full px-3 py-2 rounded text-sm font-mono resize-none"
-              style={{ background: "rgba(10,14,26,0.8)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0", minHeight: "200px" }}
+              style={{ background: "var(--input-bg)", border: "1px solid var(--input-border)", color: "var(--text)", minHeight: "200px" }}
               spellCheck={false}
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "#1e2d4a" }}>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-2 rounded text-sm"
-            style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}
+            style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
           >
             Cancel
           </button>
@@ -437,25 +437,25 @@ function DeleteConfirmModal({
     >
       <div
         className="w-full max-w-md rounded-lg overflow-hidden"
-        style={{ background: "#0f1629", border: "1px solid #1e2d4a" }}
+        style={{ background: "var(--card)", border: "1px solid var(--border)" }}
       >
-        <div className="px-5 py-4 border-b" style={{ borderColor: "#1e2d4a" }}>
+        <div className="px-5 py-4 border-b" style={{ borderColor: "var(--border)" }}>
           <span className="font-semibold" style={{ color: "#ff4444" }}>Delete Script</span>
         </div>
 
         <div className="px-5 py-6">
-          <p style={{ color: "#94a3b8" }}>
-            Are you sure you want to delete <span style={{ color: "#e2e8f0" }}>"{scriptName}"</span>?
+          <p style={{ color: "var(--dim)" }}>
+            Are you sure you want to delete <span style={{ color: "var(--text)" }}>"{scriptName}"</span>?
             This action cannot be undone.
           </p>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "#1e2d4a" }}>
+        <div className="flex justify-end gap-2 px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-2 rounded text-sm"
-            style={{ background: "rgba(30,45,74,0.4)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.7)" }}
+            style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
           >
             Cancel
           </button>
@@ -631,7 +631,7 @@ export default function ScriptsPage() {
           <polyline points="8 6 2 12 8 18" />
         </svg>
         <div className="text-center">
-          <div className="text-lg font-semibold mb-1" style={{ color: "#e2e8f0" }}>No Projects Found</div>
+          <div className="text-lg font-semibold mb-1" style={{ color: "var(--text)" }}>No Projects Found</div>
           <div className="text-sm" style={{ color: "#64748b" }}>Add a project from the Dashboard to use Scripts.</div>
         </div>
       </div>
@@ -670,7 +670,7 @@ export default function ScriptsPage() {
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
             className="px-3 py-1.5 rounded text-sm"
-            style={{ background: "rgba(30,45,74,0.5)", border: "1px solid rgba(30,45,74,0.8)", color: "#e2e8f0" }}
+            style={{ background: "var(--btn-bg)", border: "1px solid var(--input-border)", color: "var(--text)" }}
           >
             {projects.map((p) => (
               <option key={p.id} value={p.id}>{p.name}</option>

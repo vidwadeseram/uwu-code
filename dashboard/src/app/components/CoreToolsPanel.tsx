@@ -158,7 +158,7 @@ export default function CoreToolsPanel({
                   style={{
                     background: "rgba(30, 45, 74, 0.5)",
                     border: "1px solid rgba(30, 45, 74, 0.8)",
-                    color: "#e2e8f0",
+                    color: "var(--text)",
                     width: "100%",
                     maxWidth: "160px",
                     transitionProperty: "width",
@@ -222,12 +222,12 @@ export default function CoreToolsPanel({
                         </div>
                       </td>
                       <td>
-                        <span className="font-mono text-xs" style={{ color: "#e2e8f0" }}>
+                        <span className="font-mono text-xs" style={{ color: "var(--text)" }}>
                           {p.processName}
                         </span>
                       </td>
                       <td className="hidden sm:table-cell">
-                        <span className="font-mono text-xs" style={{ color: "#94a3b8" }}>
+                        <span className="font-mono text-xs" style={{ color: "var(--dim)" }}>
                           {p.pid ?? "—"}
                         </span>
                       </td>

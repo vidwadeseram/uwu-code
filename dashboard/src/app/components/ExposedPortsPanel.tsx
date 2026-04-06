@@ -145,7 +145,7 @@ export default function ExposedPortsPanel({ ports, onPortsChanged, refreshToken 
                   <div
                     key={item.port}
                     className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded px-2 py-1.5 slide-up"
-                    style={{ background: "rgba(15,23,42,0.75)", border: "1px solid #1e2d4a", "--i": i } as React.CSSProperties}
+                    style={{ background: "rgba(15,23,42,0.75)", border: "1px solid var(--border)", "--i": i } as React.CSSProperties}
                   >
                     <div className="min-w-0 flex items-center gap-2 flex-wrap">
                       <span
@@ -163,7 +163,7 @@ export default function ExposedPortsPanel({ ports, onPortsChanged, refreshToken 
                         target="_blank"
                         rel="noreferrer"
                         className="text-xs font-mono truncate"
-                        style={{ color: "#94a3b8" }}
+                        style={{ color: "var(--dim)" }}
                         title={item.url}
                       >
                         {item.url}

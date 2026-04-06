@@ -14,9 +14,9 @@ interface AuthState {
 // ── Shared input style ────────────────────────────────────────────────────────
 
 const INPUT: React.CSSProperties = {
-  background: "rgba(10,14,26,0.8)",
-  border: "1px solid rgba(30,45,74,0.8)",
-  color: "#e2e8f0",
+  background: "var(--input-bg)",
+  border: "1px solid var(--input-border)",
+  color: "var(--text)",
   borderRadius: "6px",
   padding: "8px 12px",
   fontSize: "0.8rem",
@@ -30,9 +30,9 @@ const INPUT: React.CSSProperties = {
 function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="card p-4 sm:p-5 flex flex-col gap-4">
-      <div className="flex items-center gap-2 pb-1 border-b" style={{ borderColor: "#1e2d4a" }}>
+      <div className="flex items-center gap-2 pb-1 border-b" style={{ borderColor: "var(--border)" }}>
         <span style={{ color: "#00d4ff" }}>{icon}</span>
-        <h2 className="text-sm font-semibold" style={{ color: "#e2e8f0" }}>{title}</h2>
+        <h2 className="text-sm font-semibold" style={{ color: "var(--text)" }}>{title}</h2>
       </div>
       {children}
     </div>
@@ -109,7 +109,7 @@ function ApiKeysSection({ authed }: { authed: boolean }) {
       }
     >
       <p className="text-xs" style={{ color: "#4a5568" }}>
-        Keys are stored in <code style={{ color: "#94a3b8" }}>settings.json</code> on the VPS. Leave a field blank to keep the current value.
+        Keys are stored in <code style={{ color: "var(--dim)" }}>settings.json</code> on the VPS. Leave a field blank to keep the current value.
       </p>
 
       {!authed && (
@@ -137,14 +137,14 @@ function ApiKeysSection({ authed }: { authed: boolean }) {
                   type="button"
                   onClick={() => setReveal((r) => ({ ...r, [k]: !r[k] }))}
                   className="px-2.5 py-1.5 rounded text-xs flex-shrink-0"
-                  style={{ background: "rgba(30,45,74,0.5)", color: "#94a3b8", border: "1px solid rgba(30,45,74,0.8)" }}
+                  style={{ background: "var(--btn-bg)", color: "var(--dim)", border: "1px solid var(--input-border)" }}
                 >
                   {reveal[k] ? "Hide" : "Reveal"}
                 </button>
               )}
             </div>
             {reveal[k] && keys[k] && (
-              <div className="text-xs font-mono px-2 py-1 rounded" style={{ background: "rgba(10,14,26,0.8)", color: "#94a3b8" }}>
+              <div className="text-xs font-mono px-2 py-1 rounded" style={{ background: "var(--input-bg)", color: "var(--dim)" }}>
                 Current: {keys[k]}
               </div>
             )}
@@ -428,7 +428,7 @@ function GitHubSection() {
       {connected ? (
         <div className="text-xs px-3 py-2 rounded flex items-center gap-2" style={{ background: "rgba(0,255,136,0.08)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.2)" }}>
           <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#00ff88" }} />
-          Connected — token: <code className="font-mono" style={{ color: "#94a3b8" }}>{masked}</code>
+          Connected — token: <code className="font-mono" style={{ color: "var(--dim)" }}>{masked}</code>
         </div>
       ) : (
         <div className="text-xs px-3 py-2 rounded" style={{ background: "rgba(255,215,0,0.08)", color: "#ffd700", border: "1px solid rgba(255,215,0,0.2)" }}>
@@ -549,7 +549,7 @@ function ModelPicker({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>{label}</label>
+      <label className="text-xs font-medium" style={{ color: "var(--dim)" }}>{label}</label>
       <div ref={ref} className="relative">
         <button
           type="button"
@@ -561,7 +561,7 @@ function ModelPicker({
           <span className="flex items-center gap-2 min-w-0">
             {selected ? (
               <>
-                <span className="truncate" style={{ color: "#e2e8f0" }}>{selected.name}</span>
+                <span className="truncate" style={{ color: "var(--text)" }}>{selected.name}</span>
                 {selected.free ? (
                   <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-xs font-bold" style={{ background: "rgba(0,255,136,0.15)", color: "#00ff88", border: "1px solid rgba(0,255,136,0.3)" }}>FREE</span>
                 ) : (
@@ -585,9 +585,9 @@ function ModelPicker({
         {open && (
           <div
             className="absolute z-50 left-0 right-0 mt-1 rounded-lg overflow-hidden"
-            style={{ background: "#0f1629", border: "1px solid #1e2d4a", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", maxHeight: "320px", display: "flex", flexDirection: "column" }}
+            style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", maxHeight: "320px", display: "flex", flexDirection: "column" }}
           >
-            <div className="p-2 border-b" style={{ borderColor: "#1e2d4a" }}>
+            <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
               <input
                 autoFocus
                 type="text"
@@ -595,7 +595,7 @@ function ModelPicker({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full px-2 py-1.5 rounded text-xs outline-none"
-                style={{ background: "rgba(30,45,74,0.6)", color: "#e2e8f0", border: "1px solid #1e2d4a" }}
+                style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)" }}
               />
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
@@ -612,11 +612,11 @@ function ModelPicker({
                       background: m.id === value ? "rgba(0,212,255,0.08)" : "transparent",
                       borderLeft: m.id === value ? "2px solid #00d4ff" : "2px solid transparent",
                     }}
-                    onMouseEnter={(e) => { if (m.id !== value) e.currentTarget.style.background = "rgba(30,45,74,0.5)"; }}
+                    onMouseEnter={(e) => { if (m.id !== value) e.currentTarget.style.background = "var(--btn-bg)"; }}
                     onMouseLeave={(e) => { if (m.id !== value) e.currentTarget.style.background = "transparent"; }}
                   >
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-xs font-medium truncate" style={{ color: "#e2e8f0" }}>{m.name}</span>
+                      <span className="text-xs font-medium truncate" style={{ color: "var(--text)" }}>{m.name}</span>
                       <span className="text-xs font-mono truncate" style={{ color: "#4a5568" }}>{m.id}</span>
                     </div>
                     <div className="flex items-center gap-1.5 ml-2 flex-shrink-0">
@@ -682,7 +682,7 @@ function SimpleModelPicker({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-xs font-medium" style={{ color: "#94a3b8" }}>{label}</label>
+      <label className="text-xs font-medium" style={{ color: "var(--dim)" }}>{label}</label>
       {hint && <div className="text-xs" style={{ color: "#2e4a7a" }}>{hint}</div>}
       <div ref={ref} className="relative">
         <button
@@ -696,7 +696,7 @@ function SimpleModelPicker({
             {loading ? (
               <span className="spinner w-3 h-3 inline-block flex-shrink-0" style={{ border: `1.5px solid rgba(0,212,255,0.2)`, borderTopColor: accent }} />
             ) : selected ? (
-              <span className="truncate" style={{ color: "#e2e8f0" }}>{selected.name}</span>
+              <span className="truncate" style={{ color: "var(--text)" }}>{selected.name}</span>
             ) : (
               <span style={{ color: "#4a5568" }}>{value || "Select model…"}</span>
             )}
@@ -709,9 +709,9 @@ function SimpleModelPicker({
         {open && (
           <div
             className="absolute z-50 left-0 right-0 mt-1 rounded-lg overflow-hidden"
-            style={{ background: "#0f1629", border: "1px solid #1e2d4a", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", maxHeight: "320px", display: "flex", flexDirection: "column" }}
+            style={{ background: "var(--card)", border: "1px solid var(--border)", boxShadow: "0 8px 32px rgba(0,0,0,0.5)", maxHeight: "320px", display: "flex", flexDirection: "column" }}
           >
-            <div className="p-2 border-b" style={{ borderColor: "#1e2d4a" }}>
+            <div className="p-2 border-b" style={{ borderColor: "var(--border)" }}>
               <input
                 autoFocus
                 type="text"
@@ -719,7 +719,7 @@ function SimpleModelPicker({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full px-2 py-1.5 rounded text-xs outline-none"
-                style={{ background: "rgba(30,45,74,0.6)", color: "#e2e8f0", border: "1px solid #1e2d4a" }}
+                style={{ background: "var(--surface)", color: "var(--text)", border: "1px solid var(--border)" }}
               />
             </div>
             <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
@@ -736,11 +736,11 @@ function SimpleModelPicker({
                       background: m.id === value ? `rgba(0,212,255,0.08)` : "transparent",
                       borderLeft: m.id === value ? `2px solid ${accent}` : "2px solid transparent",
                     }}
-                    onMouseEnter={(e) => { if (m.id !== value) e.currentTarget.style.background = "rgba(30,45,74,0.5)"; }}
+                    onMouseEnter={(e) => { if (m.id !== value) e.currentTarget.style.background = "var(--btn-bg)"; }}
                     onMouseLeave={(e) => { if (m.id !== value) e.currentTarget.style.background = "transparent"; }}
                   >
                     <div className="flex flex-col gap-0.5 min-w-0">
-                      <span className="text-xs font-medium truncate" style={{ color: "#e2e8f0" }}>{m.name}</span>
+                      <span className="text-xs font-medium truncate" style={{ color: "var(--text)" }}>{m.name}</span>
                       <span className="text-xs font-mono truncate" style={{ color: "#4a5568" }}>{m.id}</span>
                     </div>
                   </button>
@@ -813,7 +813,7 @@ function ModelsSection() {
       <p className="text-xs" style={{ color: "#4a5568" }}>
         Choose the default model for each tool. OpenClaw uses OpenRouter; OpenCode and Claude Code read from their config files.
         {!loading && models.length > 0 && (
-          <span> OpenClaw: <strong style={{ color: "#00ff88" }}>{freeCount} free</strong> / <strong style={{ color: "#94a3b8" }}>{models.length - freeCount} paid</strong>.</span>
+          <span> OpenClaw: <strong style={{ color: "#00ff88" }}>{freeCount} free</strong> / <strong style={{ color: "var(--dim)" }}>{models.length - freeCount} paid</strong>.</span>
         )}
       </p>
 
@@ -832,7 +832,7 @@ function ModelsSection() {
           loading={loading}
         />
 
-        <div style={{ borderTop: "1px solid #1e2d4a", paddingTop: "1rem" }}>
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
           <SimpleModelPicker
             label="OpenCode — default model"
             hint={`Writes to ~/.config/opencode/opencode.json. ${opencodeModels.length} models available.`}
@@ -844,7 +844,7 @@ function ModelsSection() {
           />
         </div>
 
-        <div style={{ borderTop: "1px solid #1e2d4a", paddingTop: "1rem" }}>
+        <div style={{ borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
           <SimpleModelPicker
             label="Claude Code — default model"
             hint="Writes to ~/.claude/settings.json."
