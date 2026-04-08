@@ -15,7 +15,7 @@
 
 import fs from "fs";
 import path from "path";
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -124,13 +124,19 @@ function runTask(task: Task) {
   save(tasks);
 
   const workspace = task.workspace || REPO_ROOT;
+  const tmuxSession = `uwu-${task.id.slice(0, 8)}`;
+  try {
+    execSync(`tmux new-session -d -s "${tmuxSession}" -c "${workspace}" 2>/dev/null || true`, { timeout: 5000 });
+  } catch { /* ignore */ }
+
   const bin = task.preferred_tool === "claude" ? "claude" : "opencode";
-  const args = bin === "claude"
-    ? ["--dangerously-skip-permissions", "-p", prompt]
-    : ["-p", prompt];
-  const child = spawn(bin, args, { cwd: workspace, detached: true, stdio: "ignore" });
-  child.unref();
-  console.log(`[scheduler] spawned task ${task.id} (${task.title.slice(0, 50)}) tool=${bin} cwd=${workspace} pid=${child.pid}`);
+  const escapedPrompt = prompt.replace(/'/g, "'\\''");
+  const cmd = bin === "claude"
+    ? `claude --dangerously-skip-permissions -p '${escapedPrompt}'`
+    : `opencode -p '${escapedPrompt}'`;
+
+  spawn("tmux", ["send-keys", "-t", tmuxSession, cmd, "Enter"], { cwd: REPO_ROOT });
+  console.log(`[scheduler] spawned task ${task.id} (${task.title.slice(0, 50)}) tool=${bin} tmux=${tmuxSession} cwd=${workspace}`);
 }
 
 function tick() {

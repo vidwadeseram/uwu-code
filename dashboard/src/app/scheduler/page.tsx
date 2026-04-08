@@ -292,6 +292,24 @@ function TaskCard({
 
       {/* Actions */}
       <div className="flex items-center gap-1.5 pt-1">
+        {task.status === "running" && (
+          <button
+            onClick={() => window.open(`/terminal/`, "_blank", "noopener,noreferrer")}
+            type="button"
+            className="text-xs px-2.5 py-1 rounded transition-opacity hover:opacity-80 flex items-center gap-1"
+            style={{
+              background: "rgba(0,255,136,0.1)",
+              color: "#00ff88",
+              border: "1px solid rgba(0,255,136,0.25)",
+            }}
+          >
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <title>Terminal</title>
+              <polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" />
+            </svg>
+            Terminal
+          </button>
+        )}
         {!isActive && (
           <button
             onClick={onViewReport}
