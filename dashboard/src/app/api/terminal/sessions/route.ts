@@ -20,7 +20,7 @@ export async function GET() {
   return NextResponse.json({ sessions: sessionList });
 }
 
-export async function POST(_request: NextRequest) {
+export async function POST(request: NextRequest) {
   if (sessions.size >= MAX_SESSIONS) {
     return NextResponse.json(
       { error: `Maximum ${MAX_SESSIONS} concurrent sessions allowed` },
@@ -28,8 +28,16 @@ export async function POST(_request: NextRequest) {
     );
   }
 
+  let cwd: string | undefined;
+  try {
+    const body = await request.json();
+    cwd = body.cwd;
+  } catch {
+    cwd = undefined;
+  }
+
   const id = randomUUID();
-  const session = createTmuxSession(id);
+  const session = createTmuxSession(id, cwd);
   sessions.set(id, session);
 
   return NextResponse.json({

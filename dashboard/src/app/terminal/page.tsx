@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Terminal } from "xterm";
 import { FitAddon } from "@xterm/addon-fit";
 
@@ -17,6 +18,15 @@ interface TerminalInstance {
 }
 
 export default function TerminalPage() {
+  return (
+    <Suspense fallback={<div style={{ background: "#1e1e1e", height: "100dvh" }} />}>
+      <TerminalContent />
+    </Suspense>
+  );
+}
+
+function TerminalContent() {
+  const searchParams = useSearchParams();
   const terminalRef = useRef<HTMLDivElement>(null);
   const terminalInstance = useRef<TerminalInstance | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -85,7 +95,25 @@ export default function TerminalPage() {
 
   const initSession = useCallback(async () => {
     try {
-      const res = await fetch("/api/terminal/sessions", { method: "POST" });
+      const cwd = searchParams.get("cwd");
+      const sessionId = searchParams.get("session");
+      
+      if (sessionId) {
+        const sessionsRes = await fetch("/api/terminal/sessions");
+        const sessionsData = await sessionsRes.json();
+        const existingSession = sessionsData.sessions?.find((s: Session) => s.id === sessionId);
+        
+        if (existingSession) {
+          setSession({ id: existingSession.id, tmuxSession: existingSession.tmuxSession });
+          return;
+        }
+      }
+      
+      const res = await fetch("/api/terminal/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd: cwd || undefined }),
+      });
       const data = await res.json();
 
       if (data.error) {
@@ -97,7 +125,7 @@ export default function TerminalPage() {
     } catch {
       setError("Failed to create session");
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     initSession();
@@ -105,7 +133,12 @@ export default function TerminalPage() {
 
   const createNewTab = async () => {
     try {
-      const res = await fetch("/api/terminal/sessions", { method: "POST" });
+      const cwd = searchParams.get("cwd");
+      const res = await fetch("/api/terminal/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cwd: cwd || undefined }),
+      });
       const data = await res.json();
 
       if (data.error) {
@@ -131,7 +164,16 @@ export default function TerminalPage() {
   };
 
   const openFullTerminal = () => {
-    window.open("/terminal/", "_blank");
+    const cwd = searchParams.get("cwd");
+    const session = searchParams.get("session");
+    
+    let url = "/terminal/";
+    const params = new URLSearchParams();
+    if (cwd) params.append("cwd", cwd);
+    if (session) params.append("session", session);
+    if (params.toString()) url += "?" + params.toString();
+    
+    window.open(url, "_blank");
   };
 
   return (

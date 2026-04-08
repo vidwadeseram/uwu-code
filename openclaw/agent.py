@@ -604,6 +604,15 @@ def get_next_task(tasks: list[TaskDict]) -> TaskDict | None:
 
 # ── executors ────────────────────────────────────────────────────────────────
 
+def create_tmux_session(session_id: str, workspace: str) -> str:
+    tmux_session = f"uwu-{session_id[:8]}"
+    subprocess.run(
+        ["tmux", "new-session", "-d", "-s", tmux_session, "-c", workspace],
+        capture_output=True,
+    )
+    return tmux_session
+
+
 def run_coding_task(task: TaskDict, is_retry: bool = False) -> tuple[bool | None, str]:
     """
     Returns (True, output) on success, (False, output) on failure,
@@ -614,8 +623,9 @@ def run_coding_task(task: TaskDict, is_retry: bool = False) -> tuple[bool | None
     desc = "continue" if is_retry else task["description"]
     pref = task.get("preferred_tool", "auto")
 
-    # Build ordered list of commands to try
-    # --dangerously-skip-permissions required: Claude refuses to run as root
+    tmux_session = create_tmux_session(task["id"], workspace)
+    update_task(task["id"], session_id=task["id"])
+
     claude_cmd = ["claude", "--dangerously-skip-permissions", "--print", desc]
     opencode_cmd = ["opencode", "run", desc]
 
@@ -623,7 +633,7 @@ def run_coding_task(task: TaskDict, is_retry: bool = False) -> tuple[bool | None
         commands = [claude_cmd]
     elif pref == "opencode":
         commands = [opencode_cmd, claude_cmd]
-    else:  # auto
+    else:
         commands = [opencode_cmd, claude_cmd]
 
     last_output = ""
@@ -631,6 +641,14 @@ def run_coding_task(task: TaskDict, is_retry: bool = False) -> tuple[bool | None
         tool_name = cmd[0]
         log(f"  → trying {tool_name} in {workspace}")
         try:
+            escaped_desc = desc.replace("'", "'\\''")
+            full_cmd = " ".join(cmd[:-1] + [f"'{escaped_desc}'"])
+            
+            subprocess.run(
+                ["tmux", "send-keys", "-t", tmux_session, full_cmd, "Enter"],
+                capture_output=True,
+            )
+            
             proc = subprocess.run(
                 cmd,
                 cwd=workspace,
@@ -639,6 +657,7 @@ def run_coding_task(task: TaskDict, is_retry: bool = False) -> tuple[bool | None
                 timeout=600,
                 env={**os.environ},
             )
+            
             output = proc.stdout
             if proc.stderr.strip():
                 output += "\n\n--- stderr ---\n" + proc.stderr
@@ -650,13 +669,14 @@ def run_coding_task(task: TaskDict, is_retry: bool = False) -> tuple[bool | None
             if proc.returncode == 0:
                 return True, f"**Tool:** {tool_name}\n**Workspace:** {workspace}\n\n{output}"
 
-            # Non-zero exit — try next tool
             log(f"  {tool_name} exited {proc.returncode}, trying next...")
 
         except subprocess.TimeoutExpired:
             return False, f"Timed out after 10 minutes (tool: {tool_name})"
         except FileNotFoundError:
             log(f"  {tool_name} not found, skipping")
+        except Exception as e:
+            log(f"  Error running {tool_name}: {e}")
 
     return False, f"All tools failed.\n\nLast output:\n{last_output}"
 

@@ -1,7 +1,10 @@
 import { execSync } from "child_process";
+import { existsSync, statSync, realpathSync } from "fs";
+import { resolve, relative } from "path";
 
 const MAX_SESSIONS = 10;
 const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const ALLOWED_BASE_PATHS = ["/opt/workspaces"];
 
 export interface TerminalSession {
   id: string;
@@ -24,10 +27,53 @@ function killTmuxSession(sessionName: string) {
   runCommand(`tmux kill-session -t "${sessionName}" 2>/dev/null || true`);
 }
 
-export function createTmuxSession(id: string): TerminalSession {
+export function validateAndSanitizePath(cwd: string | undefined): string {
+  if (!cwd) {
+    return "/opt/workspaces";
+  }
+
+  try {
+    const resolvedPath = resolve(cwd);
+    
+    // Security: Canonicalize path to resolve symlinks
+    const realPath = existsSync(resolvedPath) ? realpathSync(resolvedPath) : resolvedPath;
+    
+    // Security: Only allow paths under whitelisted directories
+    const isAllowed = ALLOWED_BASE_PATHS.some(allowedBase => {
+      const relativePath = relative(allowedBase, realPath);
+      // Path is allowed if it's inside the base directory (not starting with .. or /)
+      return !relativePath.startsWith('..') && !relativePath.startsWith('/') && relativePath !== '';
+    });
+    
+    if (!isAllowed) {
+      console.warn(`[Terminal] Path validation failed: ${cwd} (real: ${realPath}) not within allowed directories, falling back to default`);
+      return "/opt/workspaces";
+    }
+    
+    // Security: Ensure path exists AND is a directory (following symlinks)
+    if (!existsSync(realPath)) {
+      console.warn(`[Terminal] Resolved path does not exist: ${realPath}, falling back to default`);
+      return "/opt/workspaces";
+    }
+    
+    const stats = statSync(realPath);
+    if (!stats.isDirectory()) {
+      console.warn(`[Terminal] Resolved path is not a directory: ${realPath}, falling back to default`);
+      return "/opt/workspaces";
+    }
+    
+    return realPath;
+  } catch (error) {
+    console.error(`[Terminal] Path validation error for ${cwd}:`, error);
+    return "/opt/workspaces";
+  }
+}
+
+export function createTmuxSession(id: string, cwd?: string): TerminalSession {
   const tmuxSession = `uwu-${id.slice(0, 8)}`;
+  const workingDir = validateAndSanitizePath(cwd);
   
-  runCommand(`tmux new-session -d -s "${tmuxSession}" -c /opt/workspaces 2>/dev/null || true`);
+  runCommand(`tmux new-session -d -s "${tmuxSession}" -c "${workingDir}" 2>/dev/null || true`);
   
   return {
     id,
