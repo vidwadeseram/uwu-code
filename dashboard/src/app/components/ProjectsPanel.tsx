@@ -581,7 +581,7 @@ function ProjectRow({
         {/* Open Terminal button */}
         <button
           type="button"
-          onClick={() => window.open(`/terminal/?cwd=${encodeURIComponent(project.path)}`, "_blank", "noopener,noreferrer")}
+          onClick={() => window.open(`/terminal/?arg=${encodeURIComponent(project.path)}`, "_blank", "noopener,noreferrer")}
           className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium transition-all"
           style={{
             background: "rgba(0, 255, 136, 0.08)",
