@@ -913,18 +913,13 @@ function BranchPrModal({
   onCancel: () => void;
 }) {
   const [tool, setTool] = useState<"opencode" | "claude">("opencode");
-  const [useBranchPr, setUseBranchPr] = useState<boolean | null>(null);
+  const [useBranchPr, setUseBranchPr] = useState<boolean>(true);
 
   const taskLabel = state.milestone
     ? state.milestone.title
     : state.issue
       ? `#${state.issue.number} ${state.issue.title}`
       : "task";
-
-  if (useBranchPr !== null) {
-    onConfirm({ useBranchPr, tool });
-    return null;
-  }
 
   return (
     <div
@@ -989,9 +984,9 @@ function BranchPrModal({
                 type="button"
                 className="flex-1 py-2 rounded text-xs font-semibold transition-all"
                 style={{
-                  background: "rgba(0,212,255,0.12)",
-                  color: "#00d4ff",
-                  border: "1px solid rgba(0,212,255,0.3)",
+                  background: useBranchPr ? "rgba(0,212,255,0.12)" : "var(--btn-bg)",
+                  color: useBranchPr ? "#00d4ff" : "var(--dim)",
+                  border: `1px solid ${useBranchPr ? "rgba(0,212,255,0.3)" : "var(--input-border)"}`,
                 }}
               >
                 Branch + PR
@@ -1001,9 +996,9 @@ function BranchPrModal({
                 type="button"
                 className="flex-1 py-2 rounded text-xs font-semibold transition-all"
                 style={{
-                  background: "rgba(0,255,136,0.12)",
-                  color: "#00ff88",
-                  border: "1px solid rgba(0,255,136,0.3)",
+                  background: !useBranchPr ? "rgba(0,255,136,0.12)" : "var(--btn-bg)",
+                  color: !useBranchPr ? "#00ff88" : "var(--dim)",
+                  border: `1px solid ${!useBranchPr ? "rgba(0,255,136,0.3)" : "var(--input-border)"}`,
                 }}
               >
                 Direct commit
@@ -1012,7 +1007,7 @@ function BranchPrModal({
           </div>
         </div>
 
-        <div className="px-4 py-2 border-t flex justify-end" style={{ borderColor: "var(--border)" }}>
+        <div className="px-4 py-2 border-t flex justify-between" style={{ borderColor: "var(--border)" }}>
           <button
             onClick={onCancel}
             type="button"
@@ -1020,6 +1015,18 @@ function BranchPrModal({
             style={{ color: "#4a5568" }}
           >
             Cancel
+          </button>
+          <button
+            onClick={() => onConfirm({ useBranchPr, tool })}
+            type="button"
+            className="px-4 py-1.5 rounded text-xs font-bold transition-opacity hover:opacity-80"
+            style={{
+              background: "rgba(0,255,136,0.15)",
+              color: "#00ff88",
+              border: "1px solid rgba(0,255,136,0.4)",
+            }}
+          >
+            Queue Now
           </button>
         </div>
       </div>

@@ -453,6 +453,19 @@ EOF
 
 mkdir -p /opt/workspaces
 TTYD_BIN="$(command -v ttyd || echo /usr/bin/ttyd)"
+cat > /usr/local/bin/ttyd-cwd.sh << 'WRAPPER'
+#!/bin/bash
+ARG="$1"
+if [ -z "$ARG" ]; then
+  exec bash -l
+elif [ -d "$ARG" ]; then
+  cd "$ARG"
+  exec bash -l
+else
+  exec bash -l -c "$ARG"
+fi
+WRAPPER
+chmod +x /usr/local/bin/ttyd-cwd.sh
 cat > /etc/systemd/system/uwu-code-ttyd.service << EOF
 [Unit]
 Description=uwu-code Browser Terminal (ttyd)
@@ -462,7 +475,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/workspaces
-ExecStart=$TTYD_BIN --port $TERMINAL_PORT --writable --url-arg /bin/bash -l
+ExecStart=$TTYD_BIN --port $TERMINAL_PORT --writable --url-arg /usr/local/bin/ttyd-cwd.sh
 Restart=on-failure
 RestartSec=5
 
