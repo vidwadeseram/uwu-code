@@ -299,88 +299,107 @@ function handleSSEEvent(serverId: string, eventType: string, rawData: string): v
     return;
   }
 
-  const sessionId = extractSessionId(data);
+  const props = (data.properties || data) as Record<string, unknown>;
+  const sessionId = extractSessionId(props);
   if (!sessionId) return;
 
   const taskId = findTaskBySession(serverId, sessionId);
   if (!taskId) return;
 
-  const dedupeKey = `${eventType}:${(data.id as string) || ""}:${(data.partID as string) || ""}`;
+  const dedupeKey = `${eventType}:${(data.id as string) || ""}:${sessionId}`;
   const log = activityLog.get(taskId) || [];
   if (log.some((a) => a.metadata?.dedupeKey === dedupeKey)) return;
 
   const activityBase = { taskId, sessionId, serverId };
 
-  if (eventType === "message" || eventType === "message.created" || eventType === "message.updated") {
-    const role = data.role as string;
-    const parts = data.parts as OpenCodePart[] | undefined;
+  if (eventType === "message.updated") {
+    const info = (props.info || props) as Record<string, unknown>;
+    const role = info.role as string;
+    const parts = info.parts as OpenCodePart[] | undefined;
     if (parts) {
       for (const part of parts) {
+        const partKey = `${dedupeKey}:${part.id}`;
+        if (log.some((a) => a.metadata?.dedupeKey === partKey)) continue;
+
         if (part.type === "text" && part.text && role === "assistant") {
           logActivity(taskId, {
             ...activityBase,
             type: "message_received",
-            content: part.text.slice(0, 300),
-            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id },
+            content: part.text.slice(0, 500),
+            metadata: { dedupeKey: partKey, partId: part.id },
           });
         } else if (part.type === "tool-invocation" && part.state === "call") {
           logActivity(taskId, {
             ...activityBase,
             type: "tool_call",
             content: `${part.name || "tool"}(${formatArgs(part.args as Record<string, unknown>)})`,
-            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id, toolName: part.name },
+            metadata: { dedupeKey: partKey, partId: part.id, toolName: part.name },
           });
         } else if (part.type === "tool-result") {
           logActivity(taskId, {
             ...activityBase,
             type: "tool_result",
             content: formatResult(part.result),
-            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id },
-          });
-        } else if (part.type === "step-start") {
-          logActivity(taskId, {
-            ...activityBase,
-            type: "status_change",
-            content: `Step started`,
-            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id },
+            metadata: { dedupeKey: partKey, partId: part.id },
           });
         }
       }
-    } else if (role === "assistant" && (data.content as string)) {
-      logActivity(taskId, {
-        ...activityBase,
-        type: "message_received",
-        content: (data.content as string).slice(0, 300),
-        metadata: { dedupeKey },
-      });
     }
-  } else if (eventType === "session.status" || eventType === "status") {
+  } else if (eventType === "message.part.updated") {
+    const part = (props.part || props) as OpenCodePart;
+    const partKey = `${dedupeKey}:${part.id}`;
+    if (!log.some((a) => a.metadata?.dedupeKey === partKey)) {
+      if (part.type === "text" && part.text) {
+        const existing = log.find((a) => a.metadata?.partId === part.id && a.type === "message_received");
+        if (existing) {
+          existing.content = part.text.slice(0, 500);
+        } else {
+          logActivity(taskId, {
+            ...activityBase,
+            type: "message_received",
+            content: part.text.slice(0, 500),
+            metadata: { dedupeKey: partKey, partId: part.id },
+          });
+        }
+      }
+    }
+  } else if (eventType === "session.idle") {
     logActivity(taskId, {
       ...activityBase,
       type: "status_change",
-      content: `Session: ${data.status || "unknown"}`,
+      content: "Session idle",
       metadata: { dedupeKey },
     });
-  } else if (eventType === "permission.request" || eventType === "permission") {
-    logActivity(taskId, {
-      ...activityBase,
-      type: "permission_request",
-      content: (data.message as string) || `Permission requested: ${data.tool || ""}`,
-      metadata: { dedupeKey, permissionId: data.id },
-    });
-  } else if (eventType === "error") {
+  } else if (eventType === "session.error") {
     logActivity(taskId, {
       ...activityBase,
       type: "error",
-      content: (data.message as string) || (data.error as string) || "Unknown error",
+      content: (props.error as string) || "Session error",
       metadata: { dedupeKey },
     });
-  } else {
+  } else if (eventType === "session.updated") {
+    const info = props.info as Record<string, unknown> | undefined;
+    if (info?.title) {
+      logActivity(taskId, {
+        ...activityBase,
+        type: "status_change",
+        content: `Session: ${info.title}`,
+        metadata: { dedupeKey },
+      });
+    }
+  } else if (eventType === "file.edited") {
     logActivity(taskId, {
       ...activityBase,
-      type: "status_change",
-      content: `[${eventType}] ${rawData.slice(0, 200)}`,
-      metadata: { dedupeKey, eventType },
+      type: "diff",
+      content: `Edited: ${props.file || "unknown file"}`,
+      metadata: { dedupeKey, file: props.file },
+    });
+  } else if (eventType === "permission.updated") {
+    logActivity(taskId, {
+      ...activityBase,
+      type: "permission_request",
+      content: (props.title as string) || "Permission requested",
+      metadata: { dedupeKey },
     });
   }
 }
@@ -391,6 +410,7 @@ function extractSessionId(data: Record<string, unknown>): string | undefined {
     (data.sessionId as string) ||
     (data.session_id as string) ||
     ((data.info as Record<string, string>)?.sessionID) ||
+    ((data.info as Record<string, string>)?.id) ||
     undefined
   );
 }
@@ -550,9 +570,9 @@ async function serverFetch<T>(server: OpenCodeServer, path: string, init?: Reque
 // ── Session API ──────────────────────────────────────────────────────────────
 
 export async function createSession(server: OpenCodeServer, title?: string): Promise<OpenCodeSession> {
-  return serverFetch<OpenCodeSession>(server, "/session", {
+  return serverFetch<OpenCodeSession>(server, "/session/create", {
     method: "POST",
-    body: JSON.stringify({ title: title || `Task session` }),
+    body: JSON.stringify({}),
   });
 }
 
@@ -565,11 +585,19 @@ export async function getSessionStatus(server: OpenCodeServer): Promise<OpenCode
 }
 
 export async function abortSession(server: OpenCodeServer, sessionId: string): Promise<boolean> {
-  return serverFetch<boolean>(server, `/session/${sessionId}/abort`, { method: "POST" });
+  await serverFetch<void>(server, "/session/abort", {
+    method: "POST",
+    body: JSON.stringify({ sessionID: sessionId }),
+  });
+  return true;
 }
 
 export async function deleteSession(server: OpenCodeServer, sessionId: string): Promise<boolean> {
-  return serverFetch<boolean>(server, `/session/${sessionId}`, { method: "DELETE" });
+  await serverFetch<void>(server, "/session/delete", {
+    method: "DELETE",
+    body: JSON.stringify({ sessionID: sessionId }),
+  });
+  return true;
 }
 
 // ── Message API ──────────────────────────────────────────────────────────────
@@ -579,12 +607,16 @@ export async function sendMessage(
   sessionId: string,
   message: string,
   options?: { agent?: string; model?: string }
-): Promise<OpenCodeMessage> {
-  return serverFetch<OpenCodeMessage>(server, `/session/${sessionId}/message`, {
+): Promise<unknown> {
+  const { modelID, providerID } = getModelProvider();
+  return serverFetch(server, `/session/${sessionId}/chat`, {
     method: "POST",
     body: JSON.stringify({
+      modelID,
+      providerID,
       parts: [{ type: "text", text: message }],
-      ...options,
+      mode: "code",
+      tools: { file_edit: true, terminal: true },
     }),
   });
 }
@@ -595,11 +627,15 @@ export async function sendMessageAsync(
   message: string,
   options?: { agent?: string; model?: string }
 ): Promise<void> {
-  await serverFetch<void>(server, `/session/${sessionId}/prompt_async`, {
+  const { modelID, providerID } = getModelProvider();
+  await serverFetch<void>(server, `/session/${sessionId}/chat`, {
     method: "POST",
     body: JSON.stringify({
+      modelID,
+      providerID,
       parts: [{ type: "text", text: message }],
-      ...options,
+      mode: "code",
+      tools: { file_edit: true, terminal: true },
     }),
   });
 }
@@ -620,6 +656,20 @@ export async function getSessionDiff(
 ): Promise<unknown[]> {
   const query = messageID ? `?messageID=${messageID}` : "";
   return serverFetch<unknown[]>(server, `/session/${sessionId}/diff${query}`);
+}
+
+function getModelProvider(): { modelID: string; providerID: string } {
+  const keys = readEnvKeys();
+  if (keys.OPENROUTER_API_KEY) {
+    return { modelID: "anthropic/claude-sonnet-4", providerID: "openrouter" };
+  }
+  if (keys.ANTHROPIC_API_KEY) {
+    return { modelID: "claude-sonnet-4-20250514", providerID: "anthropic" };
+  }
+  if (keys.OPENAI_API_KEY) {
+    return { modelID: "gpt-4o", providerID: "openai" };
+  }
+  return { modelID: "anthropic/claude-sonnet-4", providerID: "openrouter" };
 }
 
 // ── Permission API (user intervention) ───────────────────────────────────────
