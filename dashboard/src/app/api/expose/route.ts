@@ -36,12 +36,25 @@ async function getPublicIp(): Promise<string> {
 }
 
 async function getUfwStatus(): Promise<string[]> {
+  const statusCheck = await runCommand("sudo ufw status 2>/dev/null");
+  const isActive = statusCheck.stdout.toLowerCase().includes("status: active");
+
+  if (isActive) {
+    const { stdout } = await runCommand(
+      "sudo ufw status | awk '/ALLOW/ && /tcp/ { for (i=1; i<=NF; i++) if ($i ~ /\\/tcp/) { gsub(/\\/tcp/, \"\", $i); if ($i ~ /^[0-9]+$/) print $i; } }' | sort -u"
+    );
+    return stdout
+      .split("\n")
+      .map((l) => l.trim().split("/")[0])
+      .filter((l) => /^\d+$/.test(l));
+  }
+
   const { stdout } = await runCommand(
-    "sudo ufw status | awk '/ALLOW/ && /tcp/ { for (i=1; i<=NF; i++) if ($i ~ /\\/tcp/) { gsub(/\\/tcp/, \"\", $i); if ($i ~ /^[0-9]+$/) print $i; } }' | sort -u"
+    "sudo iptables -L INPUT -n --line-numbers 2>/dev/null | grep 'ACCEPT.*tcp.*dpt:' | grep -oP 'dpt:\\K[0-9]+' | sort -un"
   );
   return stdout
     .split("\n")
-    .map((l) => l.trim().split("/")[0])
+    .map((l) => l.trim())
     .filter((l) => /^\d+$/.test(l));
 }
 
@@ -75,6 +88,13 @@ export async function POST(req: NextRequest) {
 
     const publicIp = await getPublicIp();
     const url = `http://${publicIp}:${port}`;
+
+    const statusCheck = await runCommand("sudo ufw status 2>/dev/null");
+    const ufwActive = statusCheck.stdout.toLowerCase().includes("status: active");
+
+    if (!ufwActive) {
+      await runCommand("echo y | sudo ufw enable 2>/dev/null");
+    }
 
     const ufwResult = await runCommand(`sudo ufw allow ${port}/tcp`);
 

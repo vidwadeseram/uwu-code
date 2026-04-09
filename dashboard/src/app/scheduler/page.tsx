@@ -1325,6 +1325,9 @@ export default function SchedulerPage() {
   const agentColor = AGENT_STATE_COLOR[agentStatus.state] ?? "#4a5568";
   const currentTask = agentStatus.current_task_id ? tasks.find((t) => t.id === agentStatus.current_task_id) : null;
 
+  const effectiveState = running > 0 ? "running" as const : agentStatus.state;
+  const effectiveColor = running > 0 ? AGENT_STATE_COLOR.running ?? "#00ff88" : agentColor;
+
   return (
     <div className="max-w-screen-lg mx-auto px-4 py-6 space-y-6 fade-in">
       {/* Header */}
@@ -1356,12 +1359,12 @@ export default function SchedulerPage() {
           {/* Agent status pill */}
           <div
             className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs"
-            style={{ background: `${agentColor}12`, border: `1px solid ${agentColor}35`, color: agentColor }}
+            style={{ background: `${effectiveColor}12`, border: `1px solid ${effectiveColor}35`, color: effectiveColor }}
           >
-            {agentStatus.state === "running"
-              ? <span className="w-1.5 h-1.5 rounded-full pulse-dot" style={{ background: agentColor }} />
-              : <span className="w-1.5 h-1.5 rounded-full" style={{ background: agentColor }} />}
-            <span className="font-medium uppercase tracking-wider">{agentStatus.state}</span>
+            {effectiveState === "running"
+              ? <span className="w-1.5 h-1.5 rounded-full pulse-dot" style={{ background: effectiveColor }} />
+              : <span className="w-1.5 h-1.5 rounded-full" style={{ background: effectiveColor }} />}
+            <span className="font-medium uppercase tracking-wider">{effectiveState}</span>
             {currentTask && <span className="truncate max-w-24 opacity-70">{currentTask.title}</span>}
           </div>
 
