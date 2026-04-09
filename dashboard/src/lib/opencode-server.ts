@@ -570,9 +570,9 @@ async function serverFetch<T>(server: OpenCodeServer, path: string, init?: Reque
 // ── Session API ──────────────────────────────────────────────────────────────
 
 export async function createSession(server: OpenCodeServer, title?: string): Promise<OpenCodeSession> {
-  return serverFetch<OpenCodeSession>(server, "/session/create", {
+  return serverFetch<OpenCodeSession>(server, "/session", {
     method: "POST",
-    body: JSON.stringify({}),
+    body: JSON.stringify({ title: title || "Task session" }),
   });
 }
 
@@ -585,17 +585,15 @@ export async function getSessionStatus(server: OpenCodeServer): Promise<OpenCode
 }
 
 export async function abortSession(server: OpenCodeServer, sessionId: string): Promise<boolean> {
-  await serverFetch<void>(server, "/session/abort", {
+  await serverFetch<void>(server, `/session/${sessionId}/abort`, {
     method: "POST",
-    body: JSON.stringify({ sessionID: sessionId }),
   });
   return true;
 }
 
 export async function deleteSession(server: OpenCodeServer, sessionId: string): Promise<boolean> {
-  await serverFetch<void>(server, "/session/delete", {
+  await serverFetch<void>(server, `/session/${sessionId}`, {
     method: "DELETE",
-    body: JSON.stringify({ sessionID: sessionId }),
   });
   return true;
 }
@@ -608,15 +606,11 @@ export async function sendMessage(
   message: string,
   options?: { agent?: string; model?: string }
 ): Promise<unknown> {
-  const { modelID, providerID } = getModelProvider();
-  return serverFetch(server, `/session/${sessionId}/chat`, {
+  return serverFetch(server, `/session/${sessionId}/message`, {
     method: "POST",
     body: JSON.stringify({
-      modelID,
-      providerID,
+      ...getModelProvider(),
       parts: [{ type: "text", text: message }],
-      mode: "code",
-      tools: { file_edit: true, terminal: true },
     }),
   });
 }
@@ -627,16 +621,24 @@ export async function sendMessageAsync(
   message: string,
   options?: { agent?: string; model?: string }
 ): Promise<void> {
-  const { modelID, providerID } = getModelProvider();
-  await serverFetch<void>(server, `/session/${sessionId}/chat`, {
-    method: "POST",
-    body: JSON.stringify({
-      modelID,
-      providerID,
-      parts: [{ type: "text", text: message }],
-      mode: "code",
-      tools: { file_edit: true, terminal: true },
-    }),
+  const url = `http://${server.hostname}:${server.port}/session/${sessionId}/message`;
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+  const password = process.env.OPENCODE_SERVER_PASSWORD;
+  if (password) {
+    const username = process.env.OPENCODE_SERVER_USERNAME || "opencode";
+    headers["Authorization"] = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  }
+
+  const body = JSON.stringify({
+    ...getModelProvider(),
+    parts: [{ type: "text", text: message }],
+  });
+
+  fetch(url, { method: "POST", headers, body }).catch((err) => {
+    console.error(`[opencode-server] Async message failed:`, (err as Error).message);
   });
 }
 
@@ -788,51 +790,52 @@ export async function getTaskStatus(taskId: string): Promise<TaskStatus | null> 
   try {
     const statuses = await getSessionStatus(server);
     const sessionStatus = statuses[mapping.sessionId];
-
-    // Fetch recent messages and convert to activity
     const messages = await getMessages(server, mapping.sessionId, 20);
+
+    const polledActivity: TaskActivity[] = [];
+    const existingLog = getActivityLog(taskId);
+    const loggedPartIds = new Set(existingLog.filter((a) => a.metadata?.partId).map((a) => a.metadata?.partId));
+
     for (const msg of messages) {
       for (const part of msg.parts || []) {
-        const existingLog = getActivityLog(taskId);
-        const alreadyLogged = existingLog.some(
-          (a) => a.metadata?.partId === part.id && a.metadata?.messageId === msg.info.id
-        );
-        if (!alreadyLogged) {
-          if (part.type === "tool-invocation" && part.state === "call") {
-            logActivity(taskId, {
-              taskId,
-              sessionId: mapping.sessionId,
-              serverId: mapping.serverId,
-              type: "tool_call",
-              content: `${part.name || "tool"}(${formatArgs(part.args)})`,
-              metadata: { partId: part.id, messageId: msg.info.id, toolName: part.name, args: part.args },
-            });
-          } else if (part.type === "tool-result") {
-            logActivity(taskId, {
-              taskId,
-              sessionId: mapping.sessionId,
-              serverId: mapping.serverId,
-              type: "tool_result",
-              content: formatResult(part.result),
-              metadata: { partId: part.id, messageId: msg.info.id },
-            });
-          } else if (part.type === "text" && part.text && msg.info.role === "assistant") {
-            logActivity(taskId, {
-              taskId,
-              sessionId: mapping.sessionId,
-              serverId: mapping.serverId,
-              type: "message_received",
-              content: part.text.slice(0, 200),
-              metadata: { partId: part.id, messageId: msg.info.id },
-            });
-          }
+        if (loggedPartIds.has(part.id)) continue;
+        if (part.type === "tool-invocation" && part.state === "call") {
+          polledActivity.push({
+            id: randomUUID(), taskId, sessionId: mapping.sessionId, serverId: mapping.serverId,
+            timestamp: msg.info.createdAt || new Date().toISOString(),
+            type: "tool_call",
+            content: `${part.name || "tool"}(${formatArgs(part.args as Record<string, unknown>)})`,
+            metadata: { partId: part.id, messageId: msg.info.id },
+          });
+        } else if (part.type === "tool-result") {
+          polledActivity.push({
+            id: randomUUID(), taskId, sessionId: mapping.sessionId, serverId: mapping.serverId,
+            timestamp: msg.info.createdAt || new Date().toISOString(),
+            type: "tool_result",
+            content: formatResult(part.result),
+            metadata: { partId: part.id, messageId: msg.info.id },
+          });
+        } else if (part.type === "text" && part.text && msg.info.role === "assistant") {
+          polledActivity.push({
+            id: randomUUID(), taskId, sessionId: mapping.sessionId, serverId: mapping.serverId,
+            timestamp: msg.info.createdAt || new Date().toISOString(),
+            type: "message_received",
+            content: part.text.slice(0, 300),
+            metadata: { partId: part.id, messageId: msg.info.id },
+          });
         }
       }
     }
 
+    if (polledActivity.length > 0) {
+      const log = activityLog.get(taskId) || [];
+      log.push(...polledActivity);
+      activityLog.set(taskId, log);
+    }
+
     return {
       ...mapping,
-      sessionStatus: sessionStatus?.status || "idle",
+      sessionStatus: sessionStatus?.status || (messages.length > 0 ? "idle" : "idle"),
       messageCount: messages.length,
       lastActivity: new Date().toISOString(),
       activity: getActivityLog(taskId),
