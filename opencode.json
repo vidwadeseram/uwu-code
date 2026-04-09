@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["oh-my-opencode"],
+  "plugin": ["uwu-agent"],
   "mcp": {
     "uwu-scheduler": {
       "type": "local",

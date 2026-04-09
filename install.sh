@@ -317,18 +317,27 @@ else
 fi
 
 ###############################################################################
-# oh-my-opencode plugin (multi-agent orchestration for OpenCode)
+# uwu-agent plugin (multi-agent orchestration for OpenCode)
 ###############################################################################
-info "Installing oh-my-opencode plugin..."
-if command -v bun &>/dev/null; then
-  bun add -g oh-my-opencode >/dev/null 2>&1 || npm install -g oh-my-opencode >/dev/null 2>&1 || true
+info "Installing uwu-agent plugin from source..."
+UWU_AGENT_DIR="/opt/uwu-agent"
+if [ -d "$UWU_AGENT_DIR/.git" ]; then
+  git -C "$UWU_AGENT_DIR" pull -q 2>/dev/null || true
 else
-  npm install -g oh-my-opencode >/dev/null 2>&1 || true
+  rm -rf "$UWU_AGENT_DIR"
+  git clone --depth=1 https://github.com/uwutek/uwu-agent.git "$UWU_AGENT_DIR" -q
 fi
-if command -v bunx &>/dev/null && bunx oh-my-opencode --version >/dev/null 2>&1; then
-  success "oh-my-opencode plugin $(bunx oh-my-opencode --version 2>/dev/null | head -1) installed."
+cd "$UWU_AGENT_DIR"
+if command -v bun &>/dev/null; then
+  bun install --frozen-lockfile >/dev/null 2>&1
+  bun run build >/dev/null 2>&1
+  bun add -g "$UWU_AGENT_DIR" >/dev/null 2>&1
+fi
+if [ -f "$UWU_AGENT_DIR/dist/index.js" ]; then
+  success "uwu-agent plugin built and installed from source."
 else
-  success "oh-my-opencode plugin installed."
+  warn "uwu-agent build failed, falling back to oh-my-opencode from npm."
+  bun add -g oh-my-opencode >/dev/null 2>&1 || npm install -g oh-my-opencode >/dev/null 2>&1 || true
 fi
 
 if ! id -u uwu &>/dev/null; then
