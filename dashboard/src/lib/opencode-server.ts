@@ -13,6 +13,7 @@
 
 import { spawn, ChildProcess } from "child_process";
 import { randomUUID } from "crypto";
+import http from "http";
 import { readEnvKeys } from "@/app/lib/settings";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -113,6 +114,7 @@ export async function reconnectServers(): Promise<void> {
         servers.set(id, server);
         console.log(`[opencode-server] Reconnected to existing server at port ${port}`);
         nextPort = port + 1;
+        connectSSE(server);
       }
     } catch {}
   }
@@ -172,6 +174,225 @@ export function deleteTaskSession(taskId: string) {
 
 export function getAllTaskSessions(): Record<string, { serverId: string; sessionId: string }> {
   return Object.fromEntries(taskSessions.entries());
+}
+
+function findTaskBySession(serverId: string, sessionId: string): string | undefined {
+  for (const [taskId, mapping] of taskSessions.entries()) {
+    if (mapping.serverId === serverId && mapping.sessionId === sessionId) {
+      return taskId;
+    }
+  }
+  return undefined;
+}
+
+// ── SSE Streaming ────────────────────────────────────────────────────────────
+
+interface SSEConnection {
+  serverId: string;
+  connected: boolean;
+  req: http.ClientRequest | null;
+  reconnectTimer: ReturnType<typeof setTimeout> | null;
+}
+
+const sseConnections = new Map<string, SSEConnection>();
+
+function connectSSE(server: OpenCodeServer): void {
+  if (sseConnections.has(server.id)) return;
+
+  const headers: Record<string, string> = {
+    Accept: "text/event-stream",
+    "Cache-Control": "no-cache",
+    Connection: "keep-alive",
+  };
+
+  const password = process.env.OPENCODE_SERVER_PASSWORD;
+  if (password) {
+    const username = process.env.OPENCODE_SERVER_USERNAME || "opencode";
+    headers["Authorization"] = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+  }
+
+  const conn: SSEConnection = { serverId: server.id, connected: false, req: null, reconnectTimer: null };
+  sseConnections.set(server.id, conn);
+
+  const req = http.request(
+    { hostname: server.hostname, port: server.port, path: "/event", method: "GET", headers },
+    (res) => {
+      if (res.statusCode !== 200) {
+        console.error(`[sse] Connection to ${server.id} failed: ${res.statusCode}`);
+        scheduleReconnect(server);
+        return;
+      }
+
+      conn.connected = true;
+      console.log(`[sse] Connected to server ${server.id}`);
+
+      let buffer = "";
+      let eventType = "";
+      let eventData = "";
+
+      res.setEncoding("utf8");
+      res.on("data", (chunk: string) => {
+        buffer += chunk;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith("data: ")) {
+            eventData += line.slice(6);
+          } else if (line === "" && (eventType || eventData)) {
+            if (eventData) {
+              handleSSEEvent(server.id, eventType || "message", eventData);
+            }
+            eventType = "";
+            eventData = "";
+          } else if (line.startsWith("id: ") || line.startsWith(":")) {
+          }
+        }
+      });
+
+      res.on("end", () => {
+        conn.connected = false;
+        conn.req = null;
+        console.log(`[sse] Connection closed for server ${server.id}`);
+        sseConnections.delete(server.id);
+        scheduleReconnect(server);
+      });
+    },
+  );
+
+  req.on("error", (err) => {
+    conn.connected = false;
+    conn.req = null;
+    console.error(`[sse] Error for server ${server.id}:`, (err as Error).message);
+    sseConnections.delete(server.id);
+    scheduleReconnect(server);
+  });
+
+  req.end();
+  conn.req = req;
+}
+
+function scheduleReconnect(server: OpenCodeServer): void {
+  const existing = sseConnections.get(server.id);
+  if (existing?.reconnectTimer) clearTimeout(existing.reconnectTimer);
+
+  if (server.status !== "ready") return;
+
+  const timer = setTimeout(() => {
+    const s = servers.get(server.id);
+    if (s && s.status === "ready") {
+      console.log(`[sse] Reconnecting to server ${server.id}`);
+      connectSSE(s);
+    }
+  }, 5000);
+
+  if (existing) existing.reconnectTimer = timer;
+}
+
+function handleSSEEvent(serverId: string, eventType: string, rawData: string): void {
+  let data: Record<string, unknown>;
+  try {
+    data = JSON.parse(rawData);
+  } catch {
+    return;
+  }
+
+  const sessionId = extractSessionId(data);
+  if (!sessionId) return;
+
+  const taskId = findTaskBySession(serverId, sessionId);
+  if (!taskId) return;
+
+  const dedupeKey = `${eventType}:${(data.id as string) || ""}:${(data.partID as string) || ""}`;
+  const log = activityLog.get(taskId) || [];
+  if (log.some((a) => a.metadata?.dedupeKey === dedupeKey)) return;
+
+  const activityBase = { taskId, sessionId, serverId };
+
+  if (eventType === "message" || eventType === "message.created" || eventType === "message.updated") {
+    const role = data.role as string;
+    const parts = data.parts as OpenCodePart[] | undefined;
+    if (parts) {
+      for (const part of parts) {
+        if (part.type === "text" && part.text && role === "assistant") {
+          logActivity(taskId, {
+            ...activityBase,
+            type: "message_received",
+            content: part.text.slice(0, 300),
+            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id },
+          });
+        } else if (part.type === "tool-invocation" && part.state === "call") {
+          logActivity(taskId, {
+            ...activityBase,
+            type: "tool_call",
+            content: `${part.name || "tool"}(${formatArgs(part.args as Record<string, unknown>)})`,
+            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id, toolName: part.name },
+          });
+        } else if (part.type === "tool-result") {
+          logActivity(taskId, {
+            ...activityBase,
+            type: "tool_result",
+            content: formatResult(part.result),
+            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id },
+          });
+        } else if (part.type === "step-start") {
+          logActivity(taskId, {
+            ...activityBase,
+            type: "status_change",
+            content: `Step started`,
+            metadata: { dedupeKey: `${dedupeKey}:${part.id}`, partId: part.id },
+          });
+        }
+      }
+    } else if (role === "assistant" && (data.content as string)) {
+      logActivity(taskId, {
+        ...activityBase,
+        type: "message_received",
+        content: (data.content as string).slice(0, 300),
+        metadata: { dedupeKey },
+      });
+    }
+  } else if (eventType === "session.status" || eventType === "status") {
+    logActivity(taskId, {
+      ...activityBase,
+      type: "status_change",
+      content: `Session: ${data.status || "unknown"}`,
+      metadata: { dedupeKey },
+    });
+  } else if (eventType === "permission.request" || eventType === "permission") {
+    logActivity(taskId, {
+      ...activityBase,
+      type: "permission_request",
+      content: (data.message as string) || `Permission requested: ${data.tool || ""}`,
+      metadata: { dedupeKey, permissionId: data.id },
+    });
+  } else if (eventType === "error") {
+    logActivity(taskId, {
+      ...activityBase,
+      type: "error",
+      content: (data.message as string) || (data.error as string) || "Unknown error",
+      metadata: { dedupeKey },
+    });
+  } else {
+    logActivity(taskId, {
+      ...activityBase,
+      type: "status_change",
+      content: `[${eventType}] ${rawData.slice(0, 200)}`,
+      metadata: { dedupeKey, eventType },
+    });
+  }
+}
+
+function extractSessionId(data: Record<string, unknown>): string | undefined {
+  return (
+    (data.sessionID as string) ||
+    (data.sessionId as string) ||
+    (data.session_id as string) ||
+    ((data.info as Record<string, string>)?.sessionID) ||
+    undefined
+  );
 }
 
 // ── Server lifecycle ─────────────────────────────────────────────────────────
@@ -248,12 +469,19 @@ export async function startServer(workspace: string): Promise<OpenCodeServer> {
 
   server.status = "ready";
   console.log(`[opencode-server] Server ${id} ready at http://${hostname}:${port} (workspace: ${workspace})`);
+  connectSSE(server);
   return server;
 }
 
 export async function stopServer(serverId: string): Promise<void> {
   const server = servers.get(serverId);
   if (!server) return;
+  const conn = sseConnections.get(serverId);
+  if (conn) {
+    conn.req?.destroy();
+    if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
+    sseConnections.delete(serverId);
+  }
   try { server.process.kill("SIGTERM"); } catch { /* already dead */ }
   server.status = "stopped";
   servers.delete(serverId);
@@ -645,6 +873,11 @@ function formatResult(result: unknown): string {
 // ── Cleanup ──────────────────────────────────────────────────────────────────
 
 export function cleanup() {
+  for (const [, conn] of sseConnections) {
+    conn.req?.destroy();
+    if (conn.reconnectTimer) clearTimeout(conn.reconnectTimer);
+  }
+  sseConnections.clear();
   for (const [id, server] of servers) {
     try {
       server.process.kill("SIGTERM");

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySessionToken } from "@/app/lib/auth-token";
+import { readSettings } from "@/app/lib/settings";
 
 const LOGIN_PATH = "/login";
 const PUBLIC_API_PATHS = new Set([
   "/api/auth/login",
   "/api/auth/check",
+  "/api/settings/agent-key",
 ]);
 
 const INTERNAL_SECRET = process.env.AUTH_SECRET?.trim();
@@ -17,7 +19,8 @@ function isAgentAuthenticated(request: NextRequest): boolean {
   if (!authHeader.startsWith("Bearer ")) {
     return false;
   }
-  const agentKey = process.env.AGENT_API_KEY?.trim();
+  const settings = readSettings();
+  const agentKey = settings.agent_api_key || process.env.AGENT_API_KEY?.trim();
   if (!agentKey) return false;
   const token = authHeader.slice(7);
   return token === agentKey;
